@@ -12,6 +12,7 @@ import {
 import { useTaskStore } from '@/store/useTaskStore';
 import type { TaskStatus, RepairTask } from '@/types';
 import { STATUS_LABELS } from '@/types';
+import { getAppointmentStatus } from '@/utils/statistics';
 import { BoardColumn } from './BoardColumn';
 import { TaskCard } from './TaskCard';
 
@@ -43,6 +44,7 @@ export const KanbanBoard = () => {
       if (filters.building && task.building !== filters.building) return false;
       if (filters.urgencyId && task.urgencyId !== filters.urgencyId) return false;
       if (filters.status && task.status !== filters.status) return false;
+      if (filters.appointmentStatus && getAppointmentStatus(task) !== filters.appointmentStatus) return false;
       return true;
     });
   }, [tasks, filters]);

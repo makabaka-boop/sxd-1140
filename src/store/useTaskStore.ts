@@ -24,6 +24,10 @@ import {
 import { STATUS_LABELS, ROLE_LABELS } from '@/types';
 import { getAppointmentStatus, formatAppointmentTime } from '@/utils/statistics';
 
+const canUpdateAppointment = (task: RepairTask): boolean => {
+  return task.status === 'pending' || task.status === 'to_visit';
+};
+
 const getInitialState = (): AppState => {
   const saved = loadState();
   if (saved) {
@@ -339,7 +343,7 @@ export const useTaskStore = create<TaskStore>((set, get) => {
     updateAppointment: (taskId, appointment) => {
       const state = get();
       const task = state.tasks.find(t => t.id === taskId);
-      if (!task) return;
+      if (!task || !canUpdateAppointment(task)) return;
 
       const now = Date.now();
       const currentRole = state.currentRole;

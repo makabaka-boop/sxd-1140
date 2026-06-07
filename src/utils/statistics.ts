@@ -14,6 +14,8 @@ export const getTimeoutTasks = (tasks: RepairTask[], urgencies: Urgency[]): Repa
 
 export const getAppointmentStatus = (task: RepairTask): AppointmentStatus => {
   if (!task.appointment?.scheduledAt) return 'none';
+  if (task.status === 'completed') return 'completed';
+
   const now = Date.now();
   const scheduledAt = task.appointment.scheduledAt;
   const diffMs = scheduledAt - now;
@@ -29,7 +31,7 @@ export const getAppointmentStatus = (task: RepairTask): AppointmentStatus => {
 
   if (isToday) return 'today';
   if (diffHours <= 24) return 'upcoming';
-  return 'upcoming';
+  return 'scheduled';
 };
 
 export const getAppointmentTasks = (tasks: RepairTask[], status: AppointmentStatus): RepairTask[] => {

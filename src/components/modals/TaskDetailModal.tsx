@@ -30,6 +30,11 @@ const formatDateTime = (timestamp: number): string => {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 };
 
+const formatDateTimeLocal = (timestamp: number): string => {
+  const date = new Date(timestamp);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}T${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+};
+
 const getRecordTypeLabel = (type: string): string => {
   const map: Record<string, string> = {
     status_change: '状态变更',
@@ -174,14 +179,14 @@ export const TaskDetailModal = () => {
   };
 
   const handleSaveAppointment = () => {
-    if (!task) return;
+    if (!task || !canSetAppointment(task)) return;
     updateAppointment(task.id, appointmentForm);
     setIsEditingAppointment(false);
     setAppointmentForm({});
   };
 
   const handleClearAppointment = () => {
-    if (!task) return;
+    if (!task || !canSetAppointment(task)) return;
     updateAppointment(task.id, {
       scheduledAt: null,
       note: '',
@@ -469,7 +474,7 @@ export const TaskDetailModal = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-1">预约上门时间</label>
                     <input
                       type="datetime-local"
-                      value={appointmentForm.scheduledAt ? new Date(appointmentForm.scheduledAt).toISOString().slice(0, 16) : ''}
+                      value={appointmentForm.scheduledAt ? formatDateTimeLocal(appointmentForm.scheduledAt) : ''}
                       onChange={e => {
                         const value = e.target.value;
                         setAppointmentForm({

@@ -1,6 +1,6 @@
 export type TaskStatus = 'pending' | 'to_visit' | 'processing' | 'to_review' | 'completed' | 'deferred';
 
-export type AppointmentStatus = 'today' | 'upcoming' | 'expired' | 'none';
+export type AppointmentStatus = 'today' | 'upcoming' | 'scheduled' | 'expired' | 'completed' | 'none';
 
 export type Role = 'admin' | 'staff' | 'supervisor';
 
@@ -107,14 +107,18 @@ export const STATUS_COLORS: Record<TaskStatus, string> = {
 export const APPOINTMENT_STATUS_LABELS: Record<AppointmentStatus, string> = {
   today: '今日预约',
   upcoming: '即将开始',
+  scheduled: '已预约',
   expired: '已过期',
+  completed: '预约已完成',
   none: '未预约',
 };
 
 export const APPOINTMENT_STATUS_COLORS: Record<AppointmentStatus, string> = {
   today: 'bg-blue-50 text-blue-700 border-blue-200',
   upcoming: 'bg-green-50 text-green-700 border-green-200',
+  scheduled: 'bg-purple-50 text-purple-700 border-purple-200',
   expired: 'bg-red-50 text-red-700 border-red-200',
+  completed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   none: 'bg-gray-50 text-gray-500 border-gray-200',
 };
 
