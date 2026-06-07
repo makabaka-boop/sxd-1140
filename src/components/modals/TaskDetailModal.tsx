@@ -13,11 +13,14 @@ import {
   ChevronRight,
   MessageSquare,
   Save,
+  Calendar,
+  Bell,
+  BellOff,
 } from 'lucide-react';
 import { useTaskStore } from '@/store/useTaskStore';
-import type { TaskStatus, RepairTask } from '@/types';
-import { STATUS_LABELS, STATUS_COLORS, ROLE_LABELS, BUILDINGS } from '@/types';
-import { formatTimeAgo } from '@/utils/statistics';
+import type { TaskStatus, RepairTask, Appointment } from '@/types';
+import { STATUS_LABELS, STATUS_COLORS, ROLE_LABELS, BUILDINGS, APPOINTMENT_STATUS_LABELS, APPOINTMENT_STATUS_COLORS } from '@/types';
+import { formatTimeAgo, getAppointmentStatus, formatAppointmentTime } from '@/utils/statistics';
 import { cn } from '@/lib/utils';
 
 const STATUSES: TaskStatus[] = ['pending', 'to_visit', 'processing', 'to_review', 'completed', 'deferred'];
@@ -32,6 +35,7 @@ const getRecordTypeLabel = (type: string): string => {
     status_change: '状态变更',
     edit: '编辑修改',
     note: '备注记录',
+    appointment: '预约管理',
   };
   return map[type] || type;
 };
@@ -41,6 +45,7 @@ const getRecordTypeColor = (type: string): string => {
     status_change: 'bg-blue-50 text-blue-700 border-blue-200',
     edit: 'bg-amber-50 text-amber-700 border-amber-200',
     note: 'bg-gray-50 text-gray-700 border-gray-200',
+    appointment: 'bg-purple-50 text-purple-700 border-purple-200',
   };
   return map[type] || 'bg-gray-50 text-gray-700 border-gray-200';
 };
@@ -57,14 +62,21 @@ export const TaskDetailModal = () => {
   const updateTask = useTaskStore(state => state.updateTask);
   const updateTaskStatus = useTaskStore(state => state.updateTaskStatus);
   const addProcessRecord = useTaskStore(state => state.addProcessRecord);
+  const updateAppointment = useTaskStore(state => state.updateAppointment);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<Partial<RepairTask>>({});
   const [editNote, setEditNote] = useState('');
   const [newNote, setNewNote] = useState('');
   const [statusNote, setStatusNote] = useState('');
+  const [isEditingAppointment, setIsEditingAppointment] = useState(false);
+  const [appointmentForm, setAppointmentForm] = useState<Partial<Appointment>>({});
 
   const canEdit = currentRole !== 'supervisor';
+  const canSetAppointment = (task: RepairTask | undefined) => {
+    if (!task || !canEdit) return false;
+    return task.status === 'pending' || task.status === 'to_visit';
+  };
 
   const task = useMemo(() => {
     return tasks.find(t => t.id === selectedTaskId);
@@ -77,6 +89,8 @@ export const TaskDetailModal = () => {
       setEditNote('');
       setNewNote('');
       setStatusNote('');
+      setIsEditingAppointment(false);
+      setAppointmentForm({});
     }
   }, [isDetailModalOpen, selectedTaskId]);
 
@@ -142,6 +156,39 @@ export const TaskDetailModal = () => {
       operator: ROLE_LABELS[currentRole],
     });
     setNewNote('');
+  };
+
+  const handleStartEditAppointment = () => {
+    if (!task) return;
+    setAppointmentForm({
+      scheduledAt: task.appointment?.scheduledAt || null,
+      note: task.appointment?.note || '',
+      notifiedResident: task.appointment?.notifiedResident || false,
+    });
+    setIsEditingAppointment(true);
+  };
+
+  const handleCancelEditAppointment = () => {
+    setIsEditingAppointment(false);
+    setAppointmentForm({});
+  };
+
+  const handleSaveAppointment = () => {
+    if (!task) return;
+    updateAppointment(task.id, appointmentForm);
+    setIsEditingAppointment(false);
+    setAppointmentForm({});
+  };
+
+  const handleClearAppointment = () => {
+    if (!task) return;
+    updateAppointment(task.id, {
+      scheduledAt: null,
+      note: '',
+      notifiedResident: false,
+    });
+    setIsEditingAppointment(false);
+    setAppointmentForm({});
   };
 
   if (!isDetailModalOpen || !task) return null;
@@ -382,6 +429,133 @@ export const TaskDetailModal = () => {
                     <p className="text-sm font-medium text-gray-900">{formatDateTime(task.updatedAt)}</p>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {isEditingAppointment ? (
+              <div className="bg-purple-50 rounded-xl p-5 border border-purple-100">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-purple-600" />
+                    编辑预约上门
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleCancelEditAppointment}
+                      className="px-3 py-1.5 text-sm text-gray-600 hover:bg-white rounded-lg transition-colors flex items-center gap-1"
+                    >
+                      <XCircle className="w-4 h-4" />
+                      取消
+                    </button>
+                    {task.appointment?.scheduledAt && (
+                      <button
+                        onClick={handleClearAppointment}
+                        className="px-3 py-1.5 text-sm text-red-600 hover:bg-red-100 rounded-lg transition-colors flex items-center gap-1"
+                      >
+                        取消预约
+                      </button>
+                    )}
+                    <button
+                      onClick={handleSaveAppointment}
+                      className="px-3 py-1.5 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-1"
+                    >
+                      <Save className="w-4 h-4" />
+                      保存
+                    </button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">预约上门时间</label>
+                    <input
+                      type="datetime-local"
+                      value={appointmentForm.scheduledAt ? new Date(appointmentForm.scheduledAt).toISOString().slice(0, 16) : ''}
+                      onChange={e => {
+                        const value = e.target.value;
+                        setAppointmentForm({
+                          ...appointmentForm,
+                          scheduledAt: value ? new Date(value).getTime() : null,
+                        });
+                      }}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={appointmentForm.notifiedResident || false}
+                        onChange={e => setAppointmentForm({ ...appointmentForm, notifiedResident: e.target.checked })}
+                        className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                      />
+                      <span className="text-sm text-gray-700">已通知住户</span>
+                    </label>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">预约备注</label>
+                    <textarea
+                      value={appointmentForm.note || ''}
+                      onChange={e => setAppointmentForm({ ...appointmentForm, note: e.target.value })}
+                      placeholder="请输入预约备注信息..."
+                      rows={2}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-gray-50 rounded-xl p-5 border border-gray-100">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-purple-600" />
+                    预约上门
+                  </h3>
+                  {canSetAppointment(task) && (
+                    <button
+                      onClick={handleStartEditAppointment}
+                      className="px-3 py-1.5 text-sm text-purple-600 hover:bg-purple-50 rounded-lg transition-colors flex items-center gap-1"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                      {task.appointment?.scheduledAt ? '修改预约' : '设置预约'}
+                    </button>
+                  )}
+                </div>
+                {task.appointment?.scheduledAt ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <span className={cn('px-2.5 py-1 rounded-full text-xs font-medium border', APPOINTMENT_STATUS_COLORS[getAppointmentStatus(task)])}>
+                        {APPOINTMENT_STATUS_LABELS[getAppointmentStatus(task)]}
+                      </span>
+                      <div className="flex items-center gap-1.5 text-sm text-gray-700">
+                        <Clock className="w-4 h-4 text-gray-400" />
+                        {formatAppointmentTime(task.appointment.scheduledAt)}
+                      </div>
+                      {task.appointment.notifiedResident ? (
+                        <div className="flex items-center gap-1 text-sm text-green-600">
+                          <Bell className="w-4 h-4" />
+                          已通知
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 text-sm text-gray-400">
+                          <BellOff className="w-4 h-4" />
+                          未通知
+                        </div>
+                      )}
+                    </div>
+                    {task.appointment.note && (
+                      <p className="text-sm text-gray-600 bg-white rounded-lg p-3 border border-gray-100">
+                        {task.appointment.note}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <Calendar className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">
+                      {canSetAppointment(task) ? '暂无预约，点击右上角设置预约上门时间' : '当前状态不可设置预约'}
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 

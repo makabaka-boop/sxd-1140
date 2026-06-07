@@ -262,6 +262,11 @@ export const seedTasks: RepairTask[] = [
     contactName: '王先生',
     contactPhone: '138****1234',
     processRecords: seedProcessRecords('task1'),
+    appointment: {
+      scheduledAt: null,
+      note: '',
+      notifiedResident: false,
+    },
   },
   {
     id: 'task2',
@@ -278,6 +283,11 @@ export const seedTasks: RepairTask[] = [
     contactName: '李女士',
     contactPhone: '139****5678',
     processRecords: seedProcessRecords('task2'),
+    appointment: {
+      scheduledAt: now + 2 * hour,
+      note: '下午2点上门，业主在家',
+      notifiedResident: true,
+    },
   },
   {
     id: 'task3',
@@ -294,6 +304,11 @@ export const seedTasks: RepairTask[] = [
     contactName: '张阿姨',
     contactPhone: '137****9012',
     processRecords: seedProcessRecords('task3'),
+    appointment: {
+      scheduledAt: null,
+      note: '',
+      notifiedResident: false,
+    },
   },
   {
     id: 'task4',
@@ -310,6 +325,11 @@ export const seedTasks: RepairTask[] = [
     contactName: '刘先生',
     contactPhone: '136****3456',
     processRecords: seedProcessRecords('task4'),
+    appointment: {
+      scheduledAt: now - 4 * hour,
+      note: '上午10点上门更换锁芯',
+      notifiedResident: true,
+    },
   },
   {
     id: 'task5',
@@ -326,6 +346,11 @@ export const seedTasks: RepairTask[] = [
     contactName: '陈先生',
     contactPhone: '135****7890',
     processRecords: seedProcessRecords('task5'),
+    appointment: {
+      scheduledAt: now - 30 * hour,
+      note: '昨天下午上门修补',
+      notifiedResident: true,
+    },
   },
   {
     id: 'task6',
@@ -342,6 +367,11 @@ export const seedTasks: RepairTask[] = [
     contactName: '物业中心',
     contactPhone: '010-****1234',
     processRecords: seedProcessRecords('task6'),
+    appointment: {
+      scheduledAt: null,
+      note: '',
+      notifiedResident: false,
+    },
   },
   {
     id: 'task7',
@@ -358,6 +388,11 @@ export const seedTasks: RepairTask[] = [
     contactName: '赵女士',
     contactPhone: '138****2345',
     processRecords: seedProcessRecords('task7'),
+    appointment: {
+      scheduledAt: now + 24 * hour,
+      note: '明天上午9点上门疏通',
+      notifiedResident: false,
+    },
   },
   {
     id: 'task8',
@@ -374,6 +409,11 @@ export const seedTasks: RepairTask[] = [
     contactName: '孙先生',
     contactPhone: '137****6789',
     processRecords: seedProcessRecords('task8'),
+    appointment: {
+      scheduledAt: now + 48 * hour,
+      note: '后天上午10点上门检查密封',
+      notifiedResident: true,
+    },
   },
 ];
 

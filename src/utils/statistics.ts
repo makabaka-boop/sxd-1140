@@ -1,4 +1,4 @@
-import type { RepairTask, Urgency, Assignee, TaskStatus } from '@/types';
+import type { RepairTask, Urgency, Assignee, TaskStatus, AppointmentStatus } from '@/types';
 
 export const isTaskTimeout = (task: RepairTask, urgencies: Urgency[]): boolean => {
   if (task.status === 'completed') return false;
@@ -10,6 +10,67 @@ export const isTaskTimeout = (task: RepairTask, urgencies: Urgency[]): boolean =
 
 export const getTimeoutTasks = (tasks: RepairTask[], urgencies: Urgency[]): RepairTask[] => {
   return tasks.filter(task => isTaskTimeout(task, urgencies));
+};
+
+export const getAppointmentStatus = (task: RepairTask): AppointmentStatus => {
+  if (!task.appointment?.scheduledAt) return 'none';
+  const now = Date.now();
+  const scheduledAt = task.appointment.scheduledAt;
+  const diffMs = scheduledAt - now;
+  const diffHours = diffMs / (1000 * 60 * 60);
+
+  if (diffMs < 0) return 'expired';
+
+  const scheduledDate = new Date(scheduledAt);
+  const today = new Date();
+  const isToday = scheduledDate.getDate() === today.getDate() &&
+    scheduledDate.getMonth() === today.getMonth() &&
+    scheduledDate.getFullYear() === today.getFullYear();
+
+  if (isToday) return 'today';
+  if (diffHours <= 24) return 'upcoming';
+  return 'upcoming';
+};
+
+export const getAppointmentTasks = (tasks: RepairTask[], status: AppointmentStatus): RepairTask[] => {
+  return tasks.filter(task => getAppointmentStatus(task) === status);
+};
+
+export const getTodayAppointments = (tasks: RepairTask[]): RepairTask[] => {
+  return getAppointmentTasks(tasks, 'today');
+};
+
+export const getUpcomingAppointments = (tasks: RepairTask[]): RepairTask[] => {
+  return getAppointmentTasks(tasks, 'upcoming');
+};
+
+export const getExpiredAppointments = (tasks: RepairTask[]): RepairTask[] => {
+  return getAppointmentTasks(tasks, 'expired').filter(t => t.status !== 'completed');
+};
+
+export const formatAppointmentTime = (timestamp: number | null): string => {
+  if (!timestamp) return '未预约';
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffDays = Math.floor((timestamp - now.getTime()) / (1000 * 60 * 60 * 24));
+
+  const timeStr = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+
+  if (date.getDate() === now.getDate() &&
+    date.getMonth() === now.getMonth() &&
+    date.getFullYear() === now.getFullYear()) {
+    return `今天 ${timeStr}`;
+  }
+
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  if (date.getDate() === tomorrow.getDate() &&
+    date.getMonth() === tomorrow.getMonth() &&
+    date.getFullYear() === tomorrow.getFullYear()) {
+    return `明天 ${timeStr}`;
+  }
+
+  return `${date.getMonth() + 1}月${date.getDate()}日 ${timeStr}`;
 };
 
 export const getAssigneeWorkload = (tasks: RepairTask[], assignees: Assignee[]): Array<{ assignee: Assignee; count: number }> => {

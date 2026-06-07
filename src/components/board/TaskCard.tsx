@@ -12,9 +12,11 @@ import {
   User,
   MapPin,
   Eye,
+  Calendar,
 } from 'lucide-react';
 import type { RepairTask, Urgency, Assignee, RepairType } from '@/types';
-import { isTaskTimeout, formatTimeAgo } from '@/utils/statistics';
+import { isTaskTimeout, formatTimeAgo, getAppointmentStatus, formatAppointmentTime } from '@/utils/statistics';
+import { APPOINTMENT_STATUS_COLORS, APPOINTMENT_STATUS_LABELS } from '@/types';
 import { cn } from '@/lib/utils';
 import { useTaskStore } from '@/store/useTaskStore';
 
@@ -98,6 +100,17 @@ export const TaskCard = ({ task, urgencies, assignees, repairTypes, disabled }: 
 
       <h4 className="font-medium text-gray-900 text-sm mb-2 line-clamp-2">{task.title}</h4>
       <p className="text-xs text-gray-500 mb-3 line-clamp-2">{task.description}</p>
+
+      {task.appointment?.scheduledAt && (
+        <div className={cn('mb-3 p-2 rounded-lg border', APPOINTMENT_STATUS_COLORS[getAppointmentStatus(task)])}>
+          <div className="flex items-center gap-1.5 text-xs">
+            <Calendar className="w-3.5 h-3.5" />
+            <span className="font-medium">{APPOINTMENT_STATUS_LABELS[getAppointmentStatus(task)]}</span>
+            <span className="opacity-75">·</span>
+            <span>{formatAppointmentTime(task.appointment.scheduledAt)}</span>
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center gap-3 mb-3">
         <div className="flex items-center gap-1 text-xs text-gray-500">

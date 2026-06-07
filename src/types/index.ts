@@ -1,5 +1,7 @@
 export type TaskStatus = 'pending' | 'to_visit' | 'processing' | 'to_review' | 'completed' | 'deferred';
 
+export type AppointmentStatus = 'today' | 'upcoming' | 'expired' | 'none';
+
 export type Role = 'admin' | 'staff' | 'supervisor';
 
 export interface Urgency {
@@ -34,12 +36,18 @@ export interface MoveRecord {
 export interface ProcessRecord {
   id: string;
   taskId: string;
-  type: 'status_change' | 'edit' | 'note';
+  type: 'status_change' | 'edit' | 'note' | 'appointment';
   status?: TaskStatus;
   previousStatus?: TaskStatus;
   content: string;
   createdAt: number;
   operator?: string;
+}
+
+export interface Appointment {
+  scheduledAt: number | null;
+  note: string;
+  notifiedResident: boolean;
 }
 
 export interface RepairTask {
@@ -57,6 +65,7 @@ export interface RepairTask {
   contactName: string;
   contactPhone: string;
   processRecords: ProcessRecord[];
+  appointment: Appointment;
 }
 
 export interface FilterOptions {
@@ -64,6 +73,7 @@ export interface FilterOptions {
   building: string | null;
   urgencyId: string | null;
   status: TaskStatus | null;
+  appointmentStatus: AppointmentStatus | null;
 }
 
 export interface AppState {
@@ -92,6 +102,20 @@ export const STATUS_COLORS: Record<TaskStatus, string> = {
   to_review: 'bg-purple-50 text-purple-700 border-purple-200',
   completed: 'bg-green-50 text-green-700 border-green-200',
   deferred: 'bg-orange-50 text-orange-700 border-orange-200',
+};
+
+export const APPOINTMENT_STATUS_LABELS: Record<AppointmentStatus, string> = {
+  today: '今日预约',
+  upcoming: '即将开始',
+  expired: '已过期',
+  none: '未预约',
+};
+
+export const APPOINTMENT_STATUS_COLORS: Record<AppointmentStatus, string> = {
+  today: 'bg-blue-50 text-blue-700 border-blue-200',
+  upcoming: 'bg-green-50 text-green-700 border-green-200',
+  expired: 'bg-red-50 text-red-700 border-red-200',
+  none: 'bg-gray-50 text-gray-500 border-gray-200',
 };
 
 export const ROLE_LABELS: Record<Role, string> = {

@@ -10,6 +10,8 @@ import type {
   FilterOptions,
   Role,
   ProcessRecord,
+  Appointment,
+  AppointmentStatus,
 } from '@/types';
 import { loadState, saveState, generateId } from '@/utils/storage';
 import {
@@ -20,6 +22,7 @@ import {
   seedMoveRecords,
 } from '@/data/seedData';
 import { STATUS_LABELS, ROLE_LABELS } from '@/types';
+import { getAppointmentStatus, formatAppointmentTime } from '@/utils/statistics';
 
 const getInitialState = (): AppState => {
   const saved = loadState();
@@ -37,6 +40,7 @@ const getInitialState = (): AppState => {
       building: null,
       urgencyId: null,
       status: null,
+      appointmentStatus: null,
     },
     currentRole: 'staff',
   };
@@ -49,7 +53,7 @@ interface TaskStore extends AppState {
   moveTask: (taskId: string, toStatus: TaskStatus, note?: string) => void;
   setFilters: (filters: Partial<FilterOptions>) => void;
   resetFilters: () => void;
-  addTask: (task: Omit<RepairTask, 'id' | 'createdAt' | 'updatedAt' | 'processRecords'>) => void;
+  addTask: (task: Omit<RepairTask, 'id' | 'createdAt' | 'updatedAt' | 'processRecords' | 'appointment'>) => void;
   updateTask: (taskId: string, updates: Partial<RepairTask>, note?: string) => void;
   deleteTask: (taskId: string) => void;
   addUrgency: (urgency: Omit<Urgency, 'id'>) => void;
@@ -66,6 +70,7 @@ interface TaskStore extends AppState {
   closeDetailModal: () => void;
   addProcessRecord: (taskId: string, record: Omit<ProcessRecord, 'id' | 'taskId' | 'createdAt'>) => void;
   updateTaskStatus: (taskId: string, toStatus: TaskStatus, note?: string) => void;
+  updateAppointment: (taskId: string, appointment: Partial<Appointment>) => void;
 }
 
 export const useTaskStore = create<TaskStore>((set, get) => {
@@ -175,6 +180,7 @@ export const useTaskStore = create<TaskStore>((set, get) => {
           building: null,
           urgencyId: null,
           status: null,
+          appointmentStatus: null,
         },
       });
       saveState(get());
@@ -187,6 +193,11 @@ export const useTaskStore = create<TaskStore>((set, get) => {
         id: generateId(),
         createdAt: now,
         updatedAt: now,
+        appointment: {
+          scheduledAt: null,
+          note: '',
+          notifiedResident: false,
+        },
         processRecords: [
           {
             id: generateId(),
@@ -317,8 +328,76 @@ export const useTaskStore = create<TaskStore>((set, get) => {
         if (filters.building && task.building !== filters.building) return false;
         if (filters.urgencyId && task.urgencyId !== filters.urgencyId) return false;
         if (filters.status && task.status !== filters.status) return false;
+        if (filters.appointmentStatus) {
+          const appointmentStatus = getAppointmentStatus(task);
+          if (appointmentStatus !== filters.appointmentStatus) return false;
+        }
         return true;
       });
+    },
+
+    updateAppointment: (taskId, appointment) => {
+      const state = get();
+      const task = state.tasks.find(t => t.id === taskId);
+      if (!task) return;
+
+      const now = Date.now();
+      const currentRole = state.currentRole;
+      const operator = ROLE_LABELS[currentRole];
+
+      const oldAppointment = task.appointment;
+      const newAppointment = { ...oldAppointment, ...appointment };
+
+      let content = '';
+      const isNew = !oldAppointment?.scheduledAt && newAppointment.scheduledAt;
+      const isUpdated = oldAppointment?.scheduledAt && newAppointment.scheduledAt &&
+        (oldAppointment.scheduledAt !== newAppointment.scheduledAt ||
+          oldAppointment.note !== newAppointment.note ||
+          oldAppointment.notifiedResident !== newAppointment.notifiedResident);
+      const isCleared = oldAppointment?.scheduledAt && !newAppointment.scheduledAt;
+
+      if (isNew) {
+        content = `创建预约：${formatAppointmentTime(newAppointment.scheduledAt)}${newAppointment.note ? `，备注：${newAppointment.note}` : ''}${newAppointment.notifiedResident ? '，已通知住户' : ''}`;
+      } else if (isUpdated) {
+        const changes: string[] = [];
+        if (oldAppointment.scheduledAt !== newAppointment.scheduledAt) {
+          changes.push(`时间从${formatAppointmentTime(oldAppointment.scheduledAt)}变更为${formatAppointmentTime(newAppointment.scheduledAt)}`);
+        }
+        if (oldAppointment.note !== newAppointment.note) {
+          changes.push(`备注${newAppointment.note ? `更新为：${newAppointment.note}` : '已清除'}`);
+        }
+        if (oldAppointment.notifiedResident !== newAppointment.notifiedResident) {
+          changes.push(newAppointment.notifiedResident ? '标记已通知住户' : '取消已通知住户标记');
+        }
+        content = `修改预约：${changes.join('，')}`;
+      } else if (isCleared) {
+        content = '取消预约';
+      }
+
+      const processRecord: ProcessRecord | null = content ? {
+        id: generateId(),
+        taskId,
+        type: 'appointment',
+        content,
+        createdAt: now,
+        operator,
+      } : null;
+
+      set(state => ({
+        tasks: state.tasks.map(t => {
+          if (t.id !== taskId) return t;
+          const updated = {
+            ...t,
+            appointment: newAppointment,
+            updatedAt: now,
+          };
+          if (processRecord) {
+            updated.processRecords = [...t.processRecords, processRecord];
+          }
+          return updated;
+        }),
+      }));
+      saveState(get());
     },
   };
 });

@@ -1,5 +1,6 @@
 import type { RepairTask, Urgency, RepairType, Assignee, STATUS_LABELS } from '@/types';
-import { STATUS_LABELS as statusLabels } from '@/types';
+import { STATUS_LABELS as statusLabels, APPOINTMENT_STATUS_LABELS } from '@/types';
+import { getAppointmentStatus } from '@/utils/statistics';
 
 interface ExportData {
   tasks: RepairTask[];
@@ -23,6 +24,10 @@ export const exportToCSV = (data: ExportData): void => {
     '状态',
     '联系人',
     '联系电话',
+    '预约上门时间',
+    '预约状态',
+    '预约备注',
+    '是否已通知住户',
     '创建时间',
     '更新时间',
   ];
@@ -32,6 +37,13 @@ export const exportToCSV = (data: ExportData): void => {
     const urgency = urgencies.find(u => u.id === task.urgencyId)?.name || '';
     const assignee = assignees.find(a => a.id === task.assigneeId)?.name || '';
     const status = statusLabels[task.status as keyof typeof statusLabels] || task.status;
+    const appointmentStatus = getAppointmentStatus(task);
+    const appointmentStatusLabel = APPOINTMENT_STATUS_LABELS[appointmentStatus];
+    const appointmentTime = task.appointment?.scheduledAt 
+      ? new Date(task.appointment.scheduledAt).toLocaleString('zh-CN')
+      : '';
+    const appointmentNote = task.appointment?.note || '';
+    const notifiedResident = task.appointment?.notifiedResident ? '是' : '否';
     const createdAt = new Date(task.createdAt).toLocaleString('zh-CN');
     const updatedAt = new Date(task.updatedAt).toLocaleString('zh-CN');
     
@@ -47,6 +59,10 @@ export const exportToCSV = (data: ExportData): void => {
       status,
       task.contactName,
       task.contactPhone,
+      appointmentTime,
+      appointmentStatusLabel,
+      `"${appointmentNote.replace(/"/g, '""')}"`,
+      notifiedResident,
       createdAt,
       updatedAt,
     ].join(',');

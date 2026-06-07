@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
-import { Users, Clock, FileCheck, AlertTriangle, ArrowRight } from 'lucide-react';
+import { Users, Clock, FileCheck, AlertTriangle, ArrowRight, Calendar, Timer } from 'lucide-react';
 import { useTaskStore } from '@/store/useTaskStore';
-import { getTimeoutTasks, getAssigneeWorkload, getReviewWaitingCount, getUrgentTaskCount, formatTimeAgo } from '@/utils/statistics';
+import { getTimeoutTasks, getAssigneeWorkload, getReviewWaitingCount, getUrgentTaskCount, formatTimeAgo, getTodayAppointments, getExpiredAppointments } from '@/utils/statistics';
 import { STATUS_LABELS } from '@/types';
 import { StatCard } from '@/components/common/StatCard';
 
@@ -18,8 +18,10 @@ export const StatsPanel = () => {
     const reviewWaiting = getReviewWaitingCount(tasks);
     const urgentCount = getUrgentTaskCount(tasks, urgencies);
     const avgLoad = workload.length > 0 ? (workload.reduce((sum, w) => sum + w.count, 0) / workload.length).toFixed(1) : '0';
+    const todayAppointments = getTodayAppointments(tasks).length;
+    const expiredAppointments = getExpiredAppointments(tasks).length;
 
-    return { timeoutCount, workload, maxLoad, reviewWaiting, urgentCount, avgLoad };
+    return { timeoutCount, workload, maxLoad, reviewWaiting, urgentCount, avgLoad, todayAppointments, expiredAppointments };
   }, [tasks, urgencies, assignees]);
 
   const latestMove = useMemo(() => {
@@ -32,7 +34,7 @@ export const StatsPanel = () => {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <StatCard
           title="负责人负载"
           value={stats.avgLoad}
@@ -60,6 +62,20 @@ export const StatsPanel = () => {
           icon={AlertTriangle}
           color="danger"
           subtitle="紧急及以上级别"
+        />
+        <StatCard
+          title="今日预约"
+          value={stats.todayAppointments}
+          icon={Calendar}
+          color="info"
+          subtitle="今日需上门任务"
+        />
+        <StatCard
+          title="已过期预约"
+          value={stats.expiredAppointments}
+          icon={Timer}
+          color="danger"
+          subtitle="未处理过期预约"
         />
       </div>
 
