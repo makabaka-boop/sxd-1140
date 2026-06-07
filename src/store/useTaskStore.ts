@@ -9,6 +9,7 @@ import type {
   TaskStatus,
   FilterOptions,
   Role,
+  ProcessRecord,
 } from '@/types';
 import { loadState, saveState, generateId } from '@/utils/storage';
 import {
@@ -18,6 +19,7 @@ import {
   seedTasks,
   seedMoveRecords,
 } from '@/data/seedData';
+import { STATUS_LABELS, ROLE_LABELS } from '@/types';
 
 const getInitialState = (): AppState => {
   const saved = loadState();
@@ -41,12 +43,14 @@ const getInitialState = (): AppState => {
 };
 
 interface TaskStore extends AppState {
+  selectedTaskId: string | null;
+  isDetailModalOpen: boolean;
   setCurrentRole: (role: Role) => void;
   moveTask: (taskId: string, toStatus: TaskStatus, note?: string) => void;
   setFilters: (filters: Partial<FilterOptions>) => void;
   resetFilters: () => void;
-  addTask: (task: Omit<RepairTask, 'id' | 'createdAt' | 'updatedAt'>) => void;
-  updateTask: (taskId: string, updates: Partial<RepairTask>) => void;
+  addTask: (task: Omit<RepairTask, 'id' | 'createdAt' | 'updatedAt' | 'processRecords'>) => void;
+  updateTask: (taskId: string, updates: Partial<RepairTask>, note?: string) => void;
   deleteTask: (taskId: string) => void;
   addUrgency: (urgency: Omit<Urgency, 'id'>) => void;
   updateUrgency: (urgencyId: string, updates: Partial<Urgency>) => void;
@@ -58,6 +62,10 @@ interface TaskStore extends AppState {
   updateAssignee: (assigneeId: string, updates: Partial<Assignee>) => void;
   deleteAssignee: (assigneeId: string) => void;
   getFilteredTasks: () => RepairTask[];
+  openDetailModal: (taskId: string) => void;
+  closeDetailModal: () => void;
+  addProcessRecord: (taskId: string, record: Omit<ProcessRecord, 'id' | 'taskId' | 'createdAt'>) => void;
+  updateTaskStatus: (taskId: string, toStatus: TaskStatus, note?: string) => void;
 }
 
 export const useTaskStore = create<TaskStore>((set, get) => {
@@ -65,9 +73,39 @@ export const useTaskStore = create<TaskStore>((set, get) => {
   
   return {
     ...initialState,
+    selectedTaskId: null,
+    isDetailModalOpen: false,
 
     setCurrentRole: (role: Role) => {
       set({ currentRole: role });
+      saveState(get());
+    },
+
+    openDetailModal: (taskId: string) => {
+      set({ selectedTaskId: taskId, isDetailModalOpen: true });
+    },
+
+    closeDetailModal: () => {
+      set({ selectedTaskId: null, isDetailModalOpen: false });
+    },
+
+    addProcessRecord: (taskId: string, record: Omit<ProcessRecord, 'id' | 'taskId' | 'createdAt'>) => {
+      const state = get();
+      const now = Date.now();
+      const newRecord: ProcessRecord = {
+        ...record,
+        id: generateId(),
+        taskId,
+        createdAt: now,
+      };
+
+      set({
+        tasks: state.tasks.map(t =>
+          t.id === taskId
+            ? { ...t, processRecords: [...t.processRecords, newRecord], updatedAt: now }
+            : t
+        ),
+      });
       saveState(get());
     },
 
@@ -78,6 +116,9 @@ export const useTaskStore = create<TaskStore>((set, get) => {
 
       const fromStatus = task.status;
       const now = Date.now();
+      const currentRole = state.currentRole;
+      const assignee = state.assignees.find(a => a.id === task.assigneeId);
+      const operator = currentRole === 'admin' ? '管理员' : assignee?.name || '员工';
 
       const newRecord: MoveRecord = {
         id: generateId(),
@@ -86,15 +127,38 @@ export const useTaskStore = create<TaskStore>((set, get) => {
         toStatus,
         movedAt: now,
         note,
+        operator,
+      };
+
+      const processRecord: ProcessRecord = {
+        id: generateId(),
+        taskId,
+        type: 'status_change',
+        status: toStatus,
+        previousStatus: fromStatus,
+        content: note || `状态从「${STATUS_LABELS[fromStatus]}」变更为「${STATUS_LABELS[toStatus]}」`,
+        createdAt: now,
+        operator,
       };
 
       set({
         tasks: state.tasks.map(t =>
-          t.id === taskId ? { ...t, status: toStatus, updatedAt: now } : t
+          t.id === taskId
+            ? {
+                ...t,
+                status: toStatus,
+                updatedAt: now,
+                processRecords: [...t.processRecords, processRecord],
+              }
+            : t
         ),
         moveRecords: [...state.moveRecords, newRecord],
       });
       saveState(get());
+    },
+
+    updateTaskStatus: (taskId: string, toStatus: TaskStatus, note = '') => {
+      get().moveTask(taskId, toStatus, note);
     },
 
     setFilters: (filters: Partial<FilterOptions>) => {
@@ -123,16 +187,49 @@ export const useTaskStore = create<TaskStore>((set, get) => {
         id: generateId(),
         createdAt: now,
         updatedAt: now,
+        processRecords: [
+          {
+            id: generateId(),
+            taskId: '',
+            type: 'note',
+            content: '任务创建',
+            createdAt: now,
+            operator: '系统',
+          },
+        ],
       };
+      newTask.processRecords[0].taskId = newTask.id;
       set(state => ({ tasks: [...state.tasks, newTask] }));
       saveState(get());
     },
 
-    updateTask: (taskId, updates) => {
+    updateTask: (taskId, updates, note) => {
+      const state = get();
+      const now = Date.now();
+      const currentRole = state.currentRole;
+      const operator = ROLE_LABELS[currentRole];
+
+      let processRecord: ProcessRecord | null = null;
+      if (note) {
+        processRecord = {
+          id: generateId(),
+          taskId,
+          type: 'edit',
+          content: note,
+          createdAt: now,
+          operator,
+        };
+      }
+
       set(state => ({
-        tasks: state.tasks.map(t =>
-          t.id === taskId ? { ...t, ...updates, updatedAt: Date.now() } : t
-        ),
+        tasks: state.tasks.map(t => {
+          if (t.id !== taskId) return t;
+          const updated = { ...t, ...updates, updatedAt: now };
+          if (processRecord) {
+            updated.processRecords = [...t.processRecords, processRecord];
+          }
+          return updated;
+        }),
       }));
       saveState(get());
     },

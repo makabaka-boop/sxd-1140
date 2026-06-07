@@ -1,6 +1,25 @@
-import type { AppState } from '@/types';
+import type { AppState, RepairTask } from '@/types';
 
 const STORAGE_KEY = 'property_maintenance_board';
+
+const migrateTask = (task: any): RepairTask => {
+  if (!task.processRecords) {
+    return {
+      ...task,
+      processRecords: [
+        {
+          id: `migrated-${task.id}`,
+          taskId: task.id,
+          type: 'note' as const,
+          content: '任务创建（数据迁移）',
+          createdAt: task.createdAt,
+          operator: '系统',
+        },
+      ],
+    };
+  }
+  return task;
+};
 
 export const loadState = (): AppState | null => {
   try {
@@ -8,7 +27,11 @@ export const loadState = (): AppState | null => {
     if (serialized === null) {
       return null;
     }
-    return JSON.parse(serialized) as AppState;
+    const state = JSON.parse(serialized) as AppState;
+    if (state.tasks) {
+      state.tasks = state.tasks.map(migrateTask);
+    }
+    return state;
   } catch (err) {
     console.error('Failed to load state from localStorage:', err);
     return null;

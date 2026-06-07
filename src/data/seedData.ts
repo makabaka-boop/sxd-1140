@@ -1,4 +1,4 @@
-import type { Urgency, RepairType, Assignee, RepairTask, MoveRecord } from '@/types';
+import type { Urgency, RepairType, Assignee, RepairTask, MoveRecord, ProcessRecord } from '@/types';
 
 const now = Date.now();
 const hour = 60 * 60 * 1000;
@@ -25,6 +25,227 @@ export const seedAssignees: Assignee[] = [
   { id: 'a4', name: '赵六' },
 ];
 
+const seedProcessRecords = (taskId: string): ProcessRecord[] => {
+  const records: ProcessRecord[] = [];
+  let timeOffset = 0;
+
+  switch (taskId) {
+    case 'task1':
+      records.push({
+        id: `pr-${taskId}-1`,
+        taskId,
+        type: 'note',
+        content: '任务创建，等待确认',
+        createdAt: now - 2 * hour,
+        operator: '系统',
+      });
+      break;
+    case 'task2':
+      records.push(
+        {
+          id: `pr-${taskId}-1`,
+          taskId,
+          type: 'note',
+          content: '任务创建，等待确认',
+          createdAt: now - 6 * hour,
+          operator: '系统',
+        },
+        {
+          id: `pr-${taskId}-2`,
+          taskId,
+          type: 'status_change',
+          status: 'to_visit',
+          previousStatus: 'pending',
+          content: '已联系业主，安排下午上门',
+          createdAt: now - 3 * hour,
+          operator: '李四',
+        }
+      );
+      break;
+    case 'task3':
+      records.push(
+        {
+          id: `pr-${taskId}-1`,
+          taskId,
+          type: 'note',
+          content: '任务创建，紧急任务',
+          createdAt: now - 1 * hour,
+          operator: '系统',
+        },
+        {
+          id: `pr-${taskId}-2`,
+          taskId,
+          type: 'status_change',
+          status: 'processing',
+          previousStatus: 'pending',
+          content: '已到达现场，正在处理漏水问题',
+          createdAt: now - 30 * 60 * 1000,
+          operator: '王五',
+        }
+      );
+      break;
+    case 'task4':
+      records.push(
+        {
+          id: `pr-${taskId}-1`,
+          taskId,
+          type: 'note',
+          content: '任务创建',
+          createdAt: now - 10 * hour,
+          operator: '系统',
+        },
+        {
+          id: `pr-${taskId}-2`,
+          taskId,
+          type: 'status_change',
+          status: 'to_visit',
+          previousStatus: 'pending',
+          content: '已联系业主确认上门时间',
+          createdAt: now - 8 * hour,
+          operator: '张三',
+        },
+        {
+          id: `pr-${taskId}-3`,
+          taskId,
+          type: 'status_change',
+          status: 'processing',
+          previousStatus: 'to_visit',
+          content: '开始更换锁芯',
+          createdAt: now - 3 * hour,
+          operator: '张三',
+        },
+        {
+          id: `pr-${taskId}-4`,
+          taskId,
+          type: 'status_change',
+          status: 'to_review',
+          previousStatus: 'processing',
+          content: '锁芯更换完成，待复核',
+          createdAt: now - 1 * hour,
+          operator: '张三',
+        }
+      );
+      break;
+    case 'task5':
+      records.push(
+        {
+          id: `pr-${taskId}-1`,
+          taskId,
+          type: 'note',
+          content: '任务创建',
+          createdAt: now - 48 * hour,
+          operator: '系统',
+        },
+        {
+          id: `pr-${taskId}-2`,
+          taskId,
+          type: 'status_change',
+          status: 'to_visit',
+          previousStatus: 'pending',
+          content: '已安排师傅上门',
+          createdAt: now - 40 * hour,
+          operator: '赵六',
+        },
+        {
+          id: `pr-${taskId}-3`,
+          taskId,
+          type: 'status_change',
+          status: 'processing',
+          previousStatus: 'to_visit',
+          content: '开始墙面修补工作',
+          createdAt: now - 30 * hour,
+          operator: '赵六',
+        },
+        {
+          id: `pr-${taskId}-4`,
+          taskId,
+          type: 'status_change',
+          status: 'to_review',
+          previousStatus: 'processing',
+          content: '墙面修补完成，待验收',
+          createdAt: now - 10 * hour,
+          operator: '赵六',
+        },
+        {
+          id: `pr-${taskId}-5`,
+          taskId,
+          type: 'status_change',
+          status: 'completed',
+          previousStatus: 'to_review',
+          content: '墙面修补验收通过，任务完成',
+          createdAt: now - 5 * hour,
+          operator: '主管',
+        }
+      );
+      break;
+    case 'task6':
+      records.push(
+        {
+          id: `pr-${taskId}-1`,
+          taskId,
+          type: 'note',
+          content: '任务创建',
+          createdAt: now - 20 * hour,
+          operator: '系统',
+        },
+        {
+          id: `pr-${taskId}-2`,
+          taskId,
+          type: 'status_change',
+          status: 'to_visit',
+          previousStatus: 'pending',
+          content: '安排技术人员检查',
+          createdAt: now - 18 * hour,
+          operator: '李四',
+        },
+        {
+          id: `pr-${taskId}-3`,
+          taskId,
+          type: 'status_change',
+          status: 'deferred',
+          previousStatus: 'to_visit',
+          content: '配件缺货，需等待厂家发货，预计3天后到货',
+          createdAt: now - 10 * hour,
+          operator: '李四',
+        }
+      );
+      break;
+    case 'task7':
+      records.push({
+        id: `pr-${taskId}-1`,
+        taskId,
+        type: 'note',
+        content: '任务创建，等待确认',
+        createdAt: now - 4 * hour,
+        operator: '系统',
+      });
+      break;
+    case 'task8':
+      records.push(
+        {
+          id: `pr-${taskId}-1`,
+          taskId,
+          type: 'note',
+          content: '任务创建',
+          createdAt: now - 15 * hour,
+          operator: '系统',
+        },
+        {
+          id: `pr-${taskId}-2`,
+          taskId,
+          type: 'status_change',
+          status: 'to_visit',
+          previousStatus: 'pending',
+          content: '已安排明天上午上门检查密封情况',
+          createdAt: now - 8 * hour,
+          operator: '赵六',
+        }
+      );
+      break;
+  }
+  return records;
+};
+
 export const seedTasks: RepairTask[] = [
   {
     id: 'task1',
@@ -40,6 +261,7 @@ export const seedTasks: RepairTask[] = [
     updatedAt: now - 2 * hour,
     contactName: '王先生',
     contactPhone: '138****1234',
+    processRecords: seedProcessRecords('task1'),
   },
   {
     id: 'task2',
@@ -55,6 +277,7 @@ export const seedTasks: RepairTask[] = [
     updatedAt: now - 3 * hour,
     contactName: '李女士',
     contactPhone: '139****5678',
+    processRecords: seedProcessRecords('task2'),
   },
   {
     id: 'task3',
@@ -70,6 +293,7 @@ export const seedTasks: RepairTask[] = [
     updatedAt: now - 30 * 60 * 1000,
     contactName: '张阿姨',
     contactPhone: '137****9012',
+    processRecords: seedProcessRecords('task3'),
   },
   {
     id: 'task4',
@@ -85,6 +309,7 @@ export const seedTasks: RepairTask[] = [
     updatedAt: now - 1 * hour,
     contactName: '刘先生',
     contactPhone: '136****3456',
+    processRecords: seedProcessRecords('task4'),
   },
   {
     id: 'task5',
@@ -100,6 +325,7 @@ export const seedTasks: RepairTask[] = [
     updatedAt: now - 5 * hour,
     contactName: '陈先生',
     contactPhone: '135****7890',
+    processRecords: seedProcessRecords('task5'),
   },
   {
     id: 'task6',
@@ -115,6 +341,7 @@ export const seedTasks: RepairTask[] = [
     updatedAt: now - 10 * hour,
     contactName: '物业中心',
     contactPhone: '010-****1234',
+    processRecords: seedProcessRecords('task6'),
   },
   {
     id: 'task7',
@@ -130,6 +357,7 @@ export const seedTasks: RepairTask[] = [
     updatedAt: now - 4 * hour,
     contactName: '赵女士',
     contactPhone: '138****2345',
+    processRecords: seedProcessRecords('task7'),
   },
   {
     id: 'task8',
@@ -145,6 +373,7 @@ export const seedTasks: RepairTask[] = [
     updatedAt: now - 8 * hour,
     contactName: '孙先生',
     contactPhone: '137****6789',
+    processRecords: seedProcessRecords('task8'),
   },
 ];
 

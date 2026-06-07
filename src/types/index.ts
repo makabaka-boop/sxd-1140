@@ -28,6 +28,18 @@ export interface MoveRecord {
   toStatus: TaskStatus;
   movedAt: number;
   note: string;
+  operator?: string;
+}
+
+export interface ProcessRecord {
+  id: string;
+  taskId: string;
+  type: 'status_change' | 'edit' | 'note';
+  status?: TaskStatus;
+  previousStatus?: TaskStatus;
+  content: string;
+  createdAt: number;
+  operator?: string;
 }
 
 export interface RepairTask {
@@ -44,6 +56,7 @@ export interface RepairTask {
   updatedAt: number;
   contactName: string;
   contactPhone: string;
+  processRecords: ProcessRecord[];
 }
 
 export interface FilterOptions {

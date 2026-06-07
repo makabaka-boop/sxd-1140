@@ -3,6 +3,7 @@ import { Header } from '@/components/layout/Header';
 import { StatsPanel } from '@/components/layout/StatsPanel';
 import { FilterBar } from '@/components/filters/FilterBar';
 import { KanbanBoard } from '@/components/board/KanbanBoard';
+import { TaskDetailModal } from '@/components/modals/TaskDetailModal';
 import { useTaskStore } from '@/store/useTaskStore';
 import { getBacklogTasks, getTimeoutTasks, formatTimeAgo } from '@/utils/statistics';
 import { STATUS_LABELS } from '@/types';
@@ -103,6 +104,7 @@ export default function Home() {
           <KanbanBoard />
         </div>
       </main>
+      <TaskDetailModal />
     </div>
   );
 }

@@ -11,10 +11,12 @@ import {
   AlertTriangle,
   User,
   MapPin,
+  Eye,
 } from 'lucide-react';
 import type { RepairTask, Urgency, Assignee, RepairType } from '@/types';
 import { isTaskTimeout, formatTimeAgo } from '@/utils/statistics';
 import { cn } from '@/lib/utils';
+import { useTaskStore } from '@/store/useTaskStore';
 
 const iconMap: Record<string, typeof Zap> = {
   Zap,
@@ -34,6 +36,8 @@ interface TaskCardProps {
 }
 
 export const TaskCard = ({ task, urgencies, assignees, repairTypes, disabled }: TaskCardProps) => {
+  const openDetailModal = useTaskStore(state => state.openDetailModal);
+
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
     disabled,
@@ -50,19 +54,30 @@ export const TaskCard = ({ task, urgencies, assignees, repairTypes, disabled }: 
 
   const TypeIcon = repairType ? iconMap[repairType.icon] || MoreHorizontal : MoreHorizontal;
 
+  const handleClick = (e: React.MouseEvent) => {
+    if (disabled || isDragging) return;
+    openDetailModal(task.id);
+  };
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       {...attributes}
       {...listeners}
+      onClick={handleClick}
       className={cn(
-        'bg-white rounded-lg p-4 shadow-sm border border-gray-100 transition-all duration-200',
-        disabled ? 'cursor-default' : 'cursor-grab active:cursor-grabbing',
+        'bg-white rounded-lg p-4 shadow-sm border border-gray-100 transition-all duration-200 relative group',
+        disabled ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing',
         isDragging && 'opacity-50 shadow-lg rotate-2',
-        !isDragging && !disabled && 'hover:shadow-md hover:-translate-y-0.5'
+        !isDragging && !disabled && 'hover:shadow-md hover:-translate-y-0.5 hover:border-blue-200'
       )}
     >
+      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="p-1.5 bg-blue-50 rounded-md text-blue-600">
+          <Eye className="w-3.5 h-3.5" />
+        </div>
+      </div>
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2">
           <div
