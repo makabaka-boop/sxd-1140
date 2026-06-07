@@ -25,17 +25,27 @@ const migrateTask = (task: any): RepairTask => {
   };
 };
 
+const migrateState = (state: any): AppState => {
+  return {
+    ...state,
+    followUpReminders: state.followUpReminders || [],
+    followUpRecords: state.followUpRecords || [],
+    filters: {
+      ...state.filters,
+      followUpStatus: state.filters?.followUpStatus || null,
+    },
+    tasks: state.tasks ? state.tasks.map(migrateTask) : [],
+  };
+};
+
 export const loadState = (): AppState | null => {
   try {
     const serialized = localStorage.getItem(STORAGE_KEY);
     if (serialized === null) {
       return null;
     }
-    const state = JSON.parse(serialized) as AppState;
-    if (state.tasks) {
-      state.tasks = state.tasks.map(migrateTask);
-    }
-    return state;
+    const state = JSON.parse(serialized);
+    return migrateState(state);
   } catch (err) {
     console.error('Failed to load state from localStorage:', err);
     return null;

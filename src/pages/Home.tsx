@@ -5,15 +5,17 @@ import { FilterBar } from '@/components/filters/FilterBar';
 import { KanbanBoard } from '@/components/board/KanbanBoard';
 import { TaskDetailModal } from '@/components/modals/TaskDetailModal';
 import { useTaskStore } from '@/store/useTaskStore';
-import { getBacklogTasks, getTimeoutTasks, formatTimeAgo, getTodayAppointments, getUpcomingAppointments, getExpiredAppointments, formatAppointmentTime } from '@/utils/statistics';
-import { STATUS_LABELS, APPOINTMENT_STATUS_COLORS } from '@/types';
-import { AlertTriangle, Clock, User, Calendar, Timer, CheckCircle2 } from 'lucide-react';
+import { getBacklogTasks, getTimeoutTasks, formatTimeAgo, getTodayAppointments, getUpcomingAppointments, getExpiredAppointments, formatAppointmentTime, getTodayFollowUps, getOverdueFollowUps, getFollowUpStatsByAssignee, formatFollowUpTime } from '@/utils/statistics';
+import { STATUS_LABELS, APPOINTMENT_STATUS_COLORS, FOLLOW_UP_STATUS_COLORS } from '@/types';
+import { AlertTriangle, Clock, User, Calendar, Timer, CheckCircle2, Bell, BellRing, Users } from 'lucide-react';
 
 export default function Home() {
   const currentRole = useTaskStore(state => state.currentRole);
   const tasks = useTaskStore(state => state.tasks);
   const urgencies = useTaskStore(state => state.urgencies);
   const assignees = useTaskStore(state => state.assignees);
+  const followUpReminders = useTaskStore(state => state.followUpReminders);
+  const openDetailModal = useTaskStore(state => state.openDetailModal);
 
   const supervisorData = useMemo(() => {
     const backlogTasks = getBacklogTasks(tasks, urgencies);
@@ -21,8 +23,11 @@ export default function Home() {
     const todayAppointments = getTodayAppointments(tasks);
     const upcomingAppointments = getUpcomingAppointments(tasks);
     const expiredAppointments = getExpiredAppointments(tasks);
-    return { backlogTasks, timeoutTasks, todayAppointments, upcomingAppointments, expiredAppointments };
-  }, [tasks, urgencies]);
+    const todayFollowUps = getTodayFollowUps(followUpReminders);
+    const overdueFollowUps = getOverdueFollowUps(followUpReminders);
+    const followUpStatsByAssignee = getFollowUpStatsByAssignee(followUpReminders, assignees);
+    return { backlogTasks, timeoutTasks, todayAppointments, upcomingAppointments, expiredAppointments, todayFollowUps, overdueFollowUps, followUpStatsByAssignee };
+  }, [tasks, urgencies, followUpReminders, assignees]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -203,6 +208,124 @@ export default function Home() {
                         </div>
                       );
                     })
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {currentRole === 'supervisor' && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <Bell className="w-5 h-5 text-blue-500" />
+                  <h3 className="font-semibold text-gray-900">今日需跟进</h3>
+                  <span className="ml-auto bg-blue-100 text-blue-700 text-xs font-medium px-2 py-1 rounded-full">
+                    {supervisorData.todayFollowUps.length}个
+                  </span>
+                </div>
+                <div className="space-y-3 max-h-64 overflow-y-auto">
+                  {supervisorData.todayFollowUps.length === 0 ? (
+                    <p className="text-sm text-gray-500 text-center py-4">今日暂无跟进任务 🎉</p>
+                  ) : (
+                    supervisorData.todayFollowUps.map(reminder => {
+                      const task = tasks.find(t => t.id === reminder.taskId);
+                      if (!task) return null;
+                      const assignee = assignees.find(a => a.id === reminder.assigneeId);
+                      return (
+                        <div 
+                          key={reminder.id} 
+                          onClick={() => openDetailModal(task.id)}
+                          className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-100 cursor-pointer hover:bg-blue-100 transition-colors"
+                        >
+                          <div className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{task.title}</p>
+                            <p className="text-xs text-gray-500">
+                              {task.building} {task.room} · {formatFollowUpTime(reminder.nextFollowUpAt)}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1 text-xs text-gray-500">
+                            <User className="w-3 h-3" />
+                            {assignee?.name || '未指定'}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <BellRing className="w-5 h-5 text-red-500" />
+                  <h3 className="font-semibold text-gray-900">逾期未跟进</h3>
+                  <span className="ml-auto bg-red-100 text-red-700 text-xs font-medium px-2 py-1 rounded-full">
+                    {supervisorData.overdueFollowUps.length}个
+                  </span>
+                </div>
+                <div className="space-y-3 max-h-64 overflow-y-auto">
+                  {supervisorData.overdueFollowUps.length === 0 ? (
+                    <p className="text-sm text-gray-500 text-center py-4">暂无逾期跟进任务 🎉</p>
+                  ) : (
+                    supervisorData.overdueFollowUps.map(reminder => {
+                      const task = tasks.find(t => t.id === reminder.taskId);
+                      if (!task) return null;
+                      const assignee = assignees.find(a => a.id === reminder.assigneeId);
+                      return (
+                        <div 
+                          key={reminder.id}
+                          onClick={() => openDetailModal(task.id)}
+                          className="flex items-center gap-3 p-3 bg-red-50 rounded-lg border border-red-100 cursor-pointer hover:bg-red-100 transition-colors"
+                        >
+                          <div className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{task.title}</p>
+                            <p className="text-xs text-gray-500">
+                              {task.building} {task.room} · {formatFollowUpTime(reminder.nextFollowUpAt)}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1 text-xs text-gray-500">
+                            <User className="w-3 h-3" />
+                            {assignee?.name || '未指定'}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <Users className="w-5 h-5 text-purple-500" />
+                  <h3 className="font-semibold text-gray-900">跟进任务分布</h3>
+                </div>
+                <div className="space-y-3 max-h-64 overflow-y-auto">
+                  {supervisorData.followUpStatsByAssignee.filter(s => s.total > 0).length === 0 ? (
+                    <p className="text-sm text-gray-500 text-center py-4">暂无跟进任务分布</p>
+                  ) : (
+                    supervisorData.followUpStatsByAssignee
+                      .filter(s => s.total > 0)
+                      .sort((a, b) => b.total - a.total)
+                      .map(stat => (
+                        <div key={stat.assignee.id} className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center">
+                                <User className="w-3 h-3 text-purple-600" />
+                              </div>
+                              <span className="text-sm font-medium text-gray-900">{stat.assignee.name}</span>
+                            </div>
+                            <span className="text-sm font-semibold text-gray-700">{stat.total}个</span>
+                          </div>
+                          <div className="flex gap-2 text-xs">
+                            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded">今日 {stat.today}</span>
+                            <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded">逾期 {stat.overdue}</span>
+                            <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded">待跟进 {stat.pending}</span>
+                          </div>
+                        </div>
+                      ))
                   )}
                 </div>
               </div>

@@ -1,4 +1,4 @@
-import type { RepairTask, Urgency, Assignee, TaskStatus, AppointmentStatus } from '@/types';
+import type { RepairTask, Urgency, Assignee, TaskStatus, AppointmentStatus, FollowUpReminder, FollowUpStatus } from '@/types';
 
 export const isTaskTimeout = (task: RepairTask, urgencies: Urgency[]): boolean => {
   if (task.status === 'completed') return false;
@@ -112,4 +112,114 @@ export const formatTimeAgo = (timestamp: number): string => {
   if (hours < 24) return `${hours}小时前`;
   const days = Math.floor(hours / 24);
   return `${days}天前`;
+};
+
+export const getTaskActiveFollowUp = (taskId: string, reminders: FollowUpReminder[]): FollowUpReminder | undefined => {
+  return reminders.find(r => r.taskId === taskId && r.status === 'active');
+};
+
+export const getFollowUpStatus = (reminder: FollowUpReminder | undefined): FollowUpStatus => {
+  if (!reminder) return 'none';
+  if (reminder.status === 'completed') return 'completed';
+
+  const now = Date.now();
+  const followUpAt = reminder.nextFollowUpAt;
+  const diffMs = followUpAt - now;
+
+  if (diffMs < 0) return 'overdue';
+
+  const followUpDate = new Date(followUpAt);
+  const today = new Date();
+  const isToday = followUpDate.getDate() === today.getDate() &&
+    followUpDate.getMonth() === today.getMonth() &&
+    followUpDate.getFullYear() === today.getFullYear();
+
+  if (isToday) return 'today';
+  return 'pending';
+};
+
+export const getTaskFollowUpStatus = (taskId: string, reminders: FollowUpReminder[]): FollowUpStatus => {
+  const reminder = getTaskActiveFollowUp(taskId, reminders);
+  return getFollowUpStatus(reminder);
+};
+
+export const formatFollowUpTime = (timestamp: number | null): string => {
+  if (!timestamp) return '未设置';
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffDays = Math.floor((timestamp - now.getTime()) / (1000 * 60 * 60 * 24));
+
+  const timeStr = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+
+  if (date.getDate() === now.getDate() &&
+    date.getMonth() === now.getMonth() &&
+    date.getFullYear() === now.getFullYear()) {
+    return `今天 ${timeStr}`;
+  }
+
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  if (date.getDate() === tomorrow.getDate() &&
+    date.getMonth() === tomorrow.getMonth() &&
+    date.getFullYear() === tomorrow.getFullYear()) {
+    return `明天 ${timeStr}`;
+  }
+
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (date.getDate() === yesterday.getDate() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getFullYear() === yesterday.getFullYear()) {
+    return `昨天 ${timeStr}`;
+  }
+
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${timeStr}`;
+};
+
+export const getTodayFollowUps = (reminders: FollowUpReminder[]): FollowUpReminder[] => {
+  return reminders.filter(r => {
+    if (r.status !== 'active') return false;
+    const status = getFollowUpStatus(r);
+    return status === 'today';
+  });
+};
+
+export const getOverdueFollowUps = (reminders: FollowUpReminder[]): FollowUpReminder[] => {
+  return reminders.filter(r => {
+    if (r.status !== 'active') return false;
+    const status = getFollowUpStatus(r);
+    return status === 'overdue';
+  });
+};
+
+export const getPendingFollowUps = (reminders: FollowUpReminder[]): FollowUpReminder[] => {
+  return reminders.filter(r => {
+    if (r.status !== 'active') return false;
+    const status = getFollowUpStatus(r);
+    return status === 'pending';
+  });
+};
+
+export const getCompletedFollowUps = (reminders: FollowUpReminder[]): FollowUpReminder[] => {
+  return reminders.filter(r => r.status === 'completed');
+};
+
+export const getFollowUpsByAssignee = (reminders: FollowUpReminder[], assigneeId: string): FollowUpReminder[] => {
+  return reminders.filter(r => r.assigneeId === assigneeId && r.status === 'active');
+};
+
+export const getFollowUpStatsByAssignee = (reminders: FollowUpReminder[], assignees: Assignee[]) => {
+  return assignees.map(assignee => {
+    const assigneeReminders = getFollowUpsByAssignee(reminders, assignee.id);
+    const today = assigneeReminders.filter(r => getFollowUpStatus(r) === 'today').length;
+    const overdue = assigneeReminders.filter(r => getFollowUpStatus(r) === 'overdue').length;
+    const pending = assigneeReminders.filter(r => getFollowUpStatus(r) === 'pending').length;
+    return {
+      assignee,
+      total: assigneeReminders.length,
+      today,
+      overdue,
+      pending,
+    };
+  });
 };

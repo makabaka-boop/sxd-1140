@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Download, ChevronDown, FileJson, FileSpreadsheet } from 'lucide-react';
 import { useTaskStore } from '@/store/useTaskStore';
 import { exportToCSV, exportToJSON } from '@/utils/export';
+import { getAppointmentStatus, getTaskFollowUpStatus } from '@/utils/statistics';
 
 export const ExportButton = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -10,16 +11,25 @@ export const ExportButton = () => {
   const urgencies = useTaskStore(state => state.urgencies);
   const repairTypes = useTaskStore(state => state.repairTypes);
   const assignees = useTaskStore(state => state.assignees);
+  const followUpReminders = useTaskStore(state => state.followUpReminders);
 
   const filteredTasks = tasks.filter(task => {
     if (filters.assigneeId && task.assigneeId !== filters.assigneeId) return false;
     if (filters.building && task.building !== filters.building) return false;
     if (filters.urgencyId && task.urgencyId !== filters.urgencyId) return false;
     if (filters.status && task.status !== filters.status) return false;
+    if (filters.appointmentStatus) {
+      const appointmentStatus = getAppointmentStatus(task);
+      if (appointmentStatus !== filters.appointmentStatus) return false;
+    }
+    if (filters.followUpStatus) {
+      const followUpStatus = getTaskFollowUpStatus(task.id, followUpReminders);
+      if (followUpStatus !== filters.followUpStatus) return false;
+    }
     return true;
   });
 
-  const data = { tasks: filteredTasks, urgencies, repairTypes, assignees };
+  const data = { tasks: filteredTasks, urgencies, repairTypes, assignees, followUpReminders };
 
   return (
     <div className="relative">

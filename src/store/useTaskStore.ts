@@ -12,6 +12,8 @@ import type {
   ProcessRecord,
   Appointment,
   AppointmentStatus,
+  FollowUpReminder,
+  FollowUpStatus,
 } from '@/types';
 import { loadState, saveState, generateId } from '@/utils/storage';
 import {
@@ -22,7 +24,7 @@ import {
   seedMoveRecords,
 } from '@/data/seedData';
 import { STATUS_LABELS, ROLE_LABELS } from '@/types';
-import { getAppointmentStatus, formatAppointmentTime } from '@/utils/statistics';
+import { getAppointmentStatus, formatAppointmentTime, getTaskFollowUpStatus, formatFollowUpTime } from '@/utils/statistics';
 
 const canUpdateAppointment = (task: RepairTask): boolean => {
   return task.status === 'pending' || task.status === 'to_visit';
@@ -39,12 +41,15 @@ const getInitialState = (): AppState => {
     repairTypes: seedRepairTypes,
     assignees: seedAssignees,
     moveRecords: seedMoveRecords,
+    followUpReminders: [],
+    followUpRecords: [],
     filters: {
       assigneeId: null,
       building: null,
       urgencyId: null,
       status: null,
       appointmentStatus: null,
+      followUpStatus: null,
     },
     currentRole: 'staff',
   };
@@ -75,6 +80,10 @@ interface TaskStore extends AppState {
   addProcessRecord: (taskId: string, record: Omit<ProcessRecord, 'id' | 'taskId' | 'createdAt'>) => void;
   updateTaskStatus: (taskId: string, toStatus: TaskStatus, note?: string) => void;
   updateAppointment: (taskId: string, appointment: Partial<Appointment>) => void;
+  addFollowUpReminder: (taskId: string, reminder: Omit<FollowUpReminder, 'id' | 'taskId' | 'createdAt' | 'updatedAt' | 'completedAt' | 'status'>) => void;
+  updateFollowUpReminder: (reminderId: string, updates: Partial<FollowUpReminder>) => void;
+  completeFollowUpReminder: (reminderId: string, note?: string) => void;
+  getTaskActiveFollowUp: (taskId: string) => FollowUpReminder | undefined;
 }
 
 export const useTaskStore = create<TaskStore>((set, get) => {
@@ -185,6 +194,7 @@ export const useTaskStore = create<TaskStore>((set, get) => {
           urgencyId: null,
           status: null,
           appointmentStatus: null,
+          followUpStatus: null,
         },
       });
       saveState(get());
@@ -325,7 +335,7 @@ export const useTaskStore = create<TaskStore>((set, get) => {
 
     getFilteredTasks: () => {
       const state = get();
-      const { tasks, filters } = state;
+      const { tasks, filters, followUpReminders } = state;
       
       return tasks.filter(task => {
         if (filters.assigneeId && task.assigneeId !== filters.assigneeId) return false;
@@ -335,6 +345,10 @@ export const useTaskStore = create<TaskStore>((set, get) => {
         if (filters.appointmentStatus) {
           const appointmentStatus = getAppointmentStatus(task);
           if (appointmentStatus !== filters.appointmentStatus) return false;
+        }
+        if (filters.followUpStatus) {
+          const followUpStatus = getTaskFollowUpStatus(task.id, followUpReminders);
+          if (followUpStatus !== filters.followUpStatus) return false;
         }
         return true;
       });
@@ -402,6 +416,137 @@ export const useTaskStore = create<TaskStore>((set, get) => {
         }),
       }));
       saveState(get());
+    },
+
+    addFollowUpReminder: (taskId, reminder) => {
+      const state = get();
+      const task = state.tasks.find(t => t.id === taskId);
+      if (!task) return;
+
+      const now = Date.now();
+      const currentRole = state.currentRole;
+      const operator = ROLE_LABELS[currentRole];
+
+      const newReminder: FollowUpReminder = {
+        ...reminder,
+        id: generateId(),
+        taskId,
+        status: 'active',
+        createdAt: now,
+        updatedAt: now,
+        completedAt: null,
+      };
+
+      const processRecord: ProcessRecord = {
+        id: generateId(),
+        taskId,
+        type: 'follow_up',
+        content: `设置跟进提醒：时间-${formatFollowUpTime(reminder.nextFollowUpAt)}，原因-${reminder.reason}${reminder.note ? `，备注-${reminder.note}` : ''}`,
+        createdAt: now,
+        operator,
+      };
+
+      set({
+        followUpReminders: [...state.followUpReminders, newReminder],
+        tasks: state.tasks.map(t =>
+          t.id === taskId
+            ? { ...t, processRecords: [...t.processRecords, processRecord], updatedAt: now }
+            : t
+        ),
+      });
+      saveState(get());
+    },
+
+    updateFollowUpReminder: (reminderId, updates) => {
+      const state = get();
+      const reminder = state.followUpReminders.find(r => r.id === reminderId);
+      if (!reminder || reminder.status !== 'active') return;
+
+      const now = Date.now();
+      const currentRole = state.currentRole;
+      const operator = ROLE_LABELS[currentRole];
+
+      const changes: string[] = [];
+      if (updates.nextFollowUpAt && updates.nextFollowUpAt !== reminder.nextFollowUpAt) {
+        changes.push(`时间从${formatFollowUpTime(reminder.nextFollowUpAt)}变更为${formatFollowUpTime(updates.nextFollowUpAt)}`);
+      }
+      if (updates.reason && updates.reason !== reminder.reason) {
+        changes.push(`原因从「${reminder.reason}」变更为「${updates.reason}」`);
+      }
+      if (updates.note !== undefined && updates.note !== reminder.note) {
+        changes.push(`备注${updates.note ? `更新为：${updates.note}` : '已清除'}`);
+      }
+      if (updates.assigneeId !== undefined && updates.assigneeId !== reminder.assigneeId) {
+        const oldAssignee = state.assignees.find(a => a.id === reminder.assigneeId)?.name || '未指定';
+        const newAssignee = updates.assigneeId ? state.assignees.find(a => a.id === updates.assigneeId)?.name || '未指定' : '未指定';
+        changes.push(`责任人从${oldAssignee}变更为${newAssignee}`);
+      }
+      if (updates.marked !== undefined && updates.marked !== reminder.marked) {
+        changes.push(updates.marked ? '标记为责任人提醒' : '取消责任人提醒标记');
+      }
+
+      if (changes.length === 0) return;
+
+      const processRecord: ProcessRecord = {
+        id: generateId(),
+        taskId: reminder.taskId,
+        type: 'follow_up',
+        content: `修改跟进提醒：${changes.join('，')}`,
+        createdAt: now,
+        operator,
+      };
+
+      set({
+        followUpReminders: state.followUpReminders.map(r =>
+          r.id === reminderId
+            ? { ...r, ...updates, updatedAt: now }
+            : r
+        ),
+        tasks: state.tasks.map(t =>
+          t.id === reminder.taskId
+            ? { ...t, processRecords: [...t.processRecords, processRecord], updatedAt: now }
+            : t
+        ),
+      });
+      saveState(get());
+    },
+
+    completeFollowUpReminder: (reminderId, note) => {
+      const state = get();
+      const reminder = state.followUpReminders.find(r => r.id === reminderId);
+      if (!reminder || reminder.status !== 'active') return;
+
+      const now = Date.now();
+      const currentRole = state.currentRole;
+      const operator = ROLE_LABELS[currentRole];
+
+      const processRecord: ProcessRecord = {
+        id: generateId(),
+        taskId: reminder.taskId,
+        type: 'follow_up',
+        content: `完成跟进提醒${note ? `，备注：${note}` : ''}`,
+        createdAt: now,
+        operator,
+      };
+
+      set({
+        followUpReminders: state.followUpReminders.map(r =>
+          r.id === reminderId
+            ? { ...r, status: 'completed', completedAt: now, updatedAt: now }
+            : r
+        ),
+        tasks: state.tasks.map(t =>
+          t.id === reminder.taskId
+            ? { ...t, processRecords: [...t.processRecords, processRecord], updatedAt: now }
+            : t
+        ),
+      });
+      saveState(get());
+    },
+
+    getTaskActiveFollowUp: (taskId) => {
+      const state = get();
+      return state.followUpReminders.find(r => r.taskId === taskId && r.status === 'active');
     },
   };
 });

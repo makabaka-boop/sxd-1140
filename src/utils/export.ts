@@ -1,16 +1,17 @@
-import type { RepairTask, Urgency, RepairType, Assignee, STATUS_LABELS } from '@/types';
-import { STATUS_LABELS as statusLabels, APPOINTMENT_STATUS_LABELS } from '@/types';
-import { getAppointmentStatus } from '@/utils/statistics';
+import type { RepairTask, Urgency, RepairType, Assignee, FollowUpReminder } from '@/types';
+import { STATUS_LABELS as statusLabels, APPOINTMENT_STATUS_LABELS, FOLLOW_UP_STATUS_LABELS } from '@/types';
+import { getAppointmentStatus, getTaskActiveFollowUp, getFollowUpStatus, formatFollowUpTime } from '@/utils/statistics';
 
 interface ExportData {
   tasks: RepairTask[];
   urgencies: Urgency[];
   repairTypes: RepairType[];
   assignees: Assignee[];
+  followUpReminders: FollowUpReminder[];
 }
 
 export const exportToCSV = (data: ExportData): void => {
-  const { tasks, urgencies, repairTypes, assignees } = data;
+  const { tasks, urgencies, repairTypes, assignees, followUpReminders } = data;
   
   const headers = [
     '任务ID',
@@ -28,6 +29,12 @@ export const exportToCSV = (data: ExportData): void => {
     '预约状态',
     '预约备注',
     '是否已通知住户',
+    '跟进状态',
+    '下次跟进时间',
+    '催办原因',
+    '催办备注',
+    '跟进责任人',
+    '是否标记责任人提醒',
     '创建时间',
     '更新时间',
   ];
@@ -44,6 +51,20 @@ export const exportToCSV = (data: ExportData): void => {
       : '';
     const appointmentNote = task.appointment?.note || '';
     const notifiedResident = task.appointment?.notifiedResident ? '是' : '否';
+    
+    const followUpReminder = getTaskActiveFollowUp(task.id, followUpReminders);
+    const followUpStatus = getFollowUpStatus(followUpReminder);
+    const followUpStatusLabel = FOLLOW_UP_STATUS_LABELS[followUpStatus];
+    const followUpTime = followUpReminder?.nextFollowUpAt
+      ? new Date(followUpReminder.nextFollowUpAt).toLocaleString('zh-CN')
+      : '';
+    const followUpReason = followUpReminder?.reason || '';
+    const followUpNote = followUpReminder?.note || '';
+    const followUpAssignee = followUpReminder?.assigneeId
+      ? assignees.find(a => a.id === followUpReminder.assigneeId)?.name || ''
+      : '';
+    const followUpMarked = followUpReminder?.marked ? '是' : '否';
+    
     const createdAt = new Date(task.createdAt).toLocaleString('zh-CN');
     const updatedAt = new Date(task.updatedAt).toLocaleString('zh-CN');
     
@@ -63,6 +84,12 @@ export const exportToCSV = (data: ExportData): void => {
       appointmentStatusLabel,
       `"${appointmentNote.replace(/"/g, '""')}"`,
       notifiedResident,
+      followUpStatusLabel,
+      followUpTime,
+      followUpReason,
+      `"${followUpNote.replace(/"/g, '""')}"`,
+      followUpAssignee,
+      followUpMarked,
       createdAt,
       updatedAt,
     ].join(',');

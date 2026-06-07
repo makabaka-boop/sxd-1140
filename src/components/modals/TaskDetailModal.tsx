@@ -10,17 +10,20 @@ import {
   Phone,
   FileText,
   AlertCircle,
+  AlertTriangle,
   ChevronRight,
   MessageSquare,
   Save,
   Calendar,
   Bell,
   BellOff,
+  BellRing,
+  CheckCircle2,
 } from 'lucide-react';
 import { useTaskStore } from '@/store/useTaskStore';
-import type { TaskStatus, RepairTask, Appointment } from '@/types';
-import { STATUS_LABELS, STATUS_COLORS, ROLE_LABELS, BUILDINGS, APPOINTMENT_STATUS_LABELS, APPOINTMENT_STATUS_COLORS } from '@/types';
-import { formatTimeAgo, getAppointmentStatus, formatAppointmentTime } from '@/utils/statistics';
+import type { TaskStatus, RepairTask, Appointment, FollowUpReminder } from '@/types';
+import { STATUS_LABELS, STATUS_COLORS, ROLE_LABELS, BUILDINGS, APPOINTMENT_STATUS_LABELS, APPOINTMENT_STATUS_COLORS, FOLLOW_UP_STATUS_LABELS, FOLLOW_UP_STATUS_COLORS, FOLLOW_UP_REASONS } from '@/types';
+import { formatTimeAgo, getAppointmentStatus, formatAppointmentTime, getTaskActiveFollowUp, getFollowUpStatus, formatFollowUpTime } from '@/utils/statistics';
 import { cn } from '@/lib/utils';
 
 const STATUSES: TaskStatus[] = ['pending', 'to_visit', 'processing', 'to_review', 'completed', 'deferred'];
@@ -41,6 +44,7 @@ const getRecordTypeLabel = (type: string): string => {
     edit: '编辑修改',
     note: '备注记录',
     appointment: '预约管理',
+    follow_up: '跟进提醒',
   };
   return map[type] || type;
 };
@@ -51,6 +55,7 @@ const getRecordTypeColor = (type: string): string => {
     edit: 'bg-amber-50 text-amber-700 border-amber-200',
     note: 'bg-gray-50 text-gray-700 border-gray-200',
     appointment: 'bg-purple-50 text-purple-700 border-purple-200',
+    follow_up: 'bg-orange-50 text-orange-700 border-orange-200',
   };
   return map[type] || 'bg-gray-50 text-gray-700 border-gray-200';
 };
@@ -64,10 +69,15 @@ export const TaskDetailModal = () => {
   const repairTypes = useTaskStore(state => state.repairTypes);
   const assignees = useTaskStore(state => state.assignees);
   const currentRole = useTaskStore(state => state.currentRole);
+  const followUpReminders = useTaskStore(state => state.followUpReminders);
   const updateTask = useTaskStore(state => state.updateTask);
   const updateTaskStatus = useTaskStore(state => state.updateTaskStatus);
   const addProcessRecord = useTaskStore(state => state.addProcessRecord);
   const updateAppointment = useTaskStore(state => state.updateAppointment);
+  const addFollowUpReminder = useTaskStore(state => state.addFollowUpReminder);
+  const updateFollowUpReminder = useTaskStore(state => state.updateFollowUpReminder);
+  const completeFollowUpReminder = useTaskStore(state => state.completeFollowUpReminder);
+  const getTaskActiveFollowUp = useTaskStore(state => state.getTaskActiveFollowUp);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<Partial<RepairTask>>({});
@@ -76,11 +86,31 @@ export const TaskDetailModal = () => {
   const [statusNote, setStatusNote] = useState('');
   const [isEditingAppointment, setIsEditingAppointment] = useState(false);
   const [appointmentForm, setAppointmentForm] = useState<Partial<Appointment>>({});
+  const [isEditingFollowUp, setIsEditingFollowUp] = useState(false);
+  const [followUpForm, setFollowUpForm] = useState<{
+    nextFollowUpAt: number | null;
+    reason: string;
+    note: string;
+    assigneeId: string | null;
+    marked: boolean;
+  }>({
+    nextFollowUpAt: null,
+    reason: '',
+    note: '',
+    assigneeId: null,
+    marked: false,
+  });
+  const [completeFollowUpNote, setCompleteFollowUpNote] = useState('');
 
   const canEdit = currentRole !== 'supervisor';
   const canSetAppointment = (task: RepairTask | undefined) => {
     if (!task || !canEdit) return false;
     return task.status === 'pending' || task.status === 'to_visit';
+  };
+  const canSetFollowUp = (task: RepairTask | undefined) => {
+    if (!task || !canEdit) return false;
+    const activeStatuses: TaskStatus[] = ['pending', 'to_visit', 'processing', 'to_review'];
+    return activeStatuses.includes(task.status);
   };
 
   const task = useMemo(() => {
@@ -96,6 +126,15 @@ export const TaskDetailModal = () => {
       setStatusNote('');
       setIsEditingAppointment(false);
       setAppointmentForm({});
+      setIsEditingFollowUp(false);
+      setFollowUpForm({
+        nextFollowUpAt: null,
+        reason: '',
+        note: '',
+        assigneeId: null,
+        marked: false,
+      });
+      setCompleteFollowUpNote('');
     }
   }, [isDetailModalOpen, selectedTaskId]);
 
@@ -111,10 +150,88 @@ export const TaskDetailModal = () => {
     return assignees.find(a => a.id === task?.assigneeId);
   }, [assignees, task]);
 
+  const activeFollowUp = useMemo(() => {
+    if (!task) return undefined;
+    return getTaskActiveFollowUp(task.id);
+  }, [task, followUpReminders]);
+
+  const followUpStatus = useMemo(() => {
+    return getFollowUpStatus(activeFollowUp);
+  }, [activeFollowUp]);
+
   const sortedRecords = useMemo(() => {
     if (!task) return [];
     return [...task.processRecords].sort((a, b) => b.createdAt - a.createdAt);
   }, [task]);
+
+  const handleStartEditFollowUp = () => {
+    if (!task) return;
+    if (activeFollowUp) {
+      setFollowUpForm({
+        nextFollowUpAt: activeFollowUp.nextFollowUpAt,
+        reason: activeFollowUp.reason,
+        note: activeFollowUp.note,
+        assigneeId: activeFollowUp.assigneeId,
+        marked: activeFollowUp.marked,
+      });
+    } else {
+      setFollowUpForm({
+        nextFollowUpAt: null,
+        reason: FOLLOW_UP_REASONS[0],
+        note: '',
+        assigneeId: task.assigneeId,
+        marked: false,
+      });
+    }
+    setIsEditingFollowUp(true);
+  };
+
+  const handleCancelEditFollowUp = () => {
+    setIsEditingFollowUp(false);
+    setFollowUpForm({
+      nextFollowUpAt: null,
+      reason: '',
+      note: '',
+      assigneeId: null,
+      marked: false,
+    });
+  };
+
+  const handleSaveFollowUp = () => {
+    if (!task || !canSetFollowUp(task) || !followUpForm.nextFollowUpAt || !followUpForm.reason) return;
+    
+    if (activeFollowUp) {
+      updateFollowUpReminder(activeFollowUp.id, {
+        nextFollowUpAt: followUpForm.nextFollowUpAt,
+        reason: followUpForm.reason,
+        note: followUpForm.note,
+        assigneeId: followUpForm.assigneeId,
+        marked: followUpForm.marked,
+      });
+    } else {
+      addFollowUpReminder(task.id, {
+        nextFollowUpAt: followUpForm.nextFollowUpAt,
+        reason: followUpForm.reason,
+        note: followUpForm.note,
+        assigneeId: followUpForm.assigneeId,
+        marked: followUpForm.marked,
+      });
+    }
+    setIsEditingFollowUp(false);
+    setFollowUpForm({
+      nextFollowUpAt: null,
+      reason: '',
+      note: '',
+      assigneeId: null,
+      marked: false,
+    });
+  };
+
+  const handleCompleteFollowUp = () => {
+    if (!activeFollowUp) return;
+    completeFollowUpReminder(activeFollowUp.id, completeFollowUpNote || undefined);
+    setCompleteFollowUpNote('');
+  };
 
   const handleStartEdit = () => {
     if (!task) return;
@@ -558,6 +675,190 @@ export const TaskDetailModal = () => {
                     <Calendar className="w-8 h-8 text-gray-300 mx-auto mb-2" />
                     <p className="text-sm text-gray-500">
                       {canSetAppointment(task) ? '暂无预约，点击右上角设置预约上门时间' : '当前状态不可设置预约'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {isEditingFollowUp ? (
+              <div className="bg-orange-50 rounded-xl p-5 border border-orange-100">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                    <BellRing className="w-4 h-4 text-orange-600" />
+                    {activeFollowUp ? '编辑跟进提醒' : '设置跟进提醒'}
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleCancelEditFollowUp}
+                      className="px-3 py-1.5 text-sm text-gray-600 hover:bg-white rounded-lg transition-colors flex items-center gap-1"
+                    >
+                      <XCircle className="w-4 h-4" />
+                      取消
+                    </button>
+                    <button
+                      onClick={handleSaveFollowUp}
+                      disabled={!followUpForm.nextFollowUpAt || !followUpForm.reason}
+                      className="px-3 py-1.5 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Save className="w-4 h-4" />
+                      保存
+                    </button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">下次跟进时间 *</label>
+                    <input
+                      type="datetime-local"
+                      value={followUpForm.nextFollowUpAt ? formatDateTimeLocal(followUpForm.nextFollowUpAt) : ''}
+                      onChange={e => {
+                        const value = e.target.value;
+                        setFollowUpForm({
+                          ...followUpForm,
+                          nextFollowUpAt: value ? new Date(value).getTime() : null,
+                        });
+                      }}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">催办原因 *</label>
+                    <select
+                      value={followUpForm.reason}
+                      onChange={e => setFollowUpForm({ ...followUpForm, reason: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    >
+                      {FOLLOW_UP_REASONS.map(reason => (
+                        <option key={reason} value={reason}>{reason}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">跟进责任人</label>
+                    <select
+                      value={followUpForm.assigneeId || ''}
+                      onChange={e => setFollowUpForm({ ...followUpForm, assigneeId: e.target.value || null })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    >
+                      <option value="">未指定</option>
+                      {assignees.map(a => (
+                        <option key={a.id} value={a.id}>{a.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-end">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={followUpForm.marked}
+                        onChange={e => setFollowUpForm({ ...followUpForm, marked: e.target.checked })}
+                        className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
+                      />
+                      <span className="text-sm text-gray-700">标记责任人提醒</span>
+                    </label>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">催办备注</label>
+                    <textarea
+                      value={followUpForm.note}
+                      onChange={e => setFollowUpForm({ ...followUpForm, note: e.target.value })}
+                      placeholder="请输入催办备注信息..."
+                      rows={2}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-gray-50 rounded-xl p-5 border border-gray-100">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                    <Bell className="w-4 h-4 text-orange-600" />
+                    跟进提醒
+                  </h3>
+                  {canSetFollowUp(task) && (
+                    <div className="flex items-center gap-2">
+                      {activeFollowUp && (
+                        <button
+                          onClick={handleCompleteFollowUp}
+                          className="px-3 py-1.5 text-sm text-green-600 hover:bg-green-50 rounded-lg transition-colors flex items-center gap-1"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          完成跟进
+                        </button>
+                      )}
+                      <button
+                        onClick={handleStartEditFollowUp}
+                        className="px-3 py-1.5 text-sm text-orange-600 hover:bg-orange-50 rounded-lg transition-colors flex items-center gap-1"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                        {activeFollowUp ? '修改跟进' : '设置跟进'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {activeFollowUp ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className={cn('px-2.5 py-1 rounded-full text-xs font-medium border', FOLLOW_UP_STATUS_COLORS[followUpStatus])}>
+                        {FOLLOW_UP_STATUS_LABELS[followUpStatus]}
+                      </span>
+                      <div className="flex items-center gap-1.5 text-sm text-gray-700">
+                        <Clock className="w-4 h-4 text-gray-400" />
+                        {formatFollowUpTime(activeFollowUp.nextFollowUpAt)}
+                      </div>
+                      <div className="flex items-center gap-1 text-sm text-gray-700">
+                        <span className="text-gray-500">原因：</span>
+                        <span className="font-medium">{activeFollowUp.reason}</span>
+                      </div>
+                      {activeFollowUp.assigneeId && (
+                        <div className="flex items-center gap-1 text-sm text-gray-700">
+                          <User className="w-4 h-4 text-gray-400" />
+                          {assignees.find(a => a.id === activeFollowUp.assigneeId)?.name || '未指定'}
+                        </div>
+                      )}
+                      {activeFollowUp.marked && (
+                        <div className="flex items-center gap-1 text-sm text-orange-600">
+                          <BellRing className="w-4 h-4" />
+                          责任人提醒
+                        </div>
+                      )}
+                    </div>
+                    {activeFollowUp.note && (
+                      <p className="text-sm text-gray-600 bg-white rounded-lg p-3 border border-gray-100">
+                        {activeFollowUp.note}
+                      </p>
+                    )}
+                    {followUpStatus === 'overdue' && (
+                      <div className="flex items-center gap-2 p-3 bg-red-50 rounded-lg border border-red-100">
+                        <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                        <p className="text-sm text-red-700">该跟进已逾期，请尽快处理！</p>
+                      </div>
+                    )}
+                    {activeFollowUp && (
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={completeFollowUpNote}
+                          onChange={e => setCompleteFollowUpNote(e.target.value)}
+                          placeholder="完成跟进备注（可选）..."
+                          className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                        />
+                        <button
+                          onClick={handleCompleteFollowUp}
+                          className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+                        >
+                          完成
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <Bell className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">
+                      {canSetFollowUp(task) ? '暂无跟进提醒，点击右上角设置下次跟进时间' : '当前状态不可设置跟进提醒'}
                     </p>
                   </div>
                 )}

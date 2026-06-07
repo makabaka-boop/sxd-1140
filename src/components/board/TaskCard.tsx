@@ -13,10 +13,12 @@ import {
   MapPin,
   Eye,
   Calendar,
+  Bell,
+  BellRing,
 } from 'lucide-react';
-import type { RepairTask, Urgency, Assignee, RepairType } from '@/types';
-import { isTaskTimeout, formatTimeAgo, getAppointmentStatus, formatAppointmentTime } from '@/utils/statistics';
-import { APPOINTMENT_STATUS_COLORS, APPOINTMENT_STATUS_LABELS } from '@/types';
+import type { RepairTask, Urgency, Assignee, RepairType, FollowUpReminder } from '@/types';
+import { isTaskTimeout, formatTimeAgo, getAppointmentStatus, formatAppointmentTime, getTaskActiveFollowUp, getFollowUpStatus, formatFollowUpTime } from '@/utils/statistics';
+import { APPOINTMENT_STATUS_COLORS, APPOINTMENT_STATUS_LABELS, FOLLOW_UP_STATUS_COLORS, FOLLOW_UP_STATUS_LABELS } from '@/types';
 import { cn } from '@/lib/utils';
 import { useTaskStore } from '@/store/useTaskStore';
 
@@ -39,6 +41,7 @@ interface TaskCardProps {
 
 export const TaskCard = ({ task, urgencies, assignees, repairTypes, disabled }: TaskCardProps) => {
   const openDetailModal = useTaskStore(state => state.openDetailModal);
+  const followUpReminders = useTaskStore(state => state.followUpReminders);
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
@@ -53,6 +56,8 @@ export const TaskCard = ({ task, urgencies, assignees, repairTypes, disabled }: 
   const assignee = assignees.find(a => a.id === task.assigneeId);
   const repairType = repairTypes.find(t => t.id === task.typeId);
   const isTimeout = isTaskTimeout(task, urgencies);
+  const followUpReminder = getTaskActiveFollowUp(task.id, followUpReminders);
+  const followUpStatus = getFollowUpStatus(followUpReminder);
 
   const TypeIcon = repairType ? iconMap[repairType.icon] || MoreHorizontal : MoreHorizontal;
 
@@ -108,6 +113,27 @@ export const TaskCard = ({ task, urgencies, assignees, repairTypes, disabled }: 
             <span className="font-medium">{APPOINTMENT_STATUS_LABELS[getAppointmentStatus(task)]}</span>
             <span className="opacity-75">·</span>
             <span>{formatAppointmentTime(task.appointment.scheduledAt)}</span>
+          </div>
+        </div>
+      )}
+
+      {followUpReminder && followUpStatus !== 'none' && (
+        <div className={cn('mb-3 p-2 rounded-lg border', FOLLOW_UP_STATUS_COLORS[followUpStatus])}>
+          <div className="flex items-center gap-1.5 text-xs">
+            {followUpStatus === 'overdue' ? (
+              <BellRing className="w-3.5 h-3.5" />
+            ) : (
+              <Bell className="w-3.5 h-3.5" />
+            )}
+            <span className="font-medium">{FOLLOW_UP_STATUS_LABELS[followUpStatus]}</span>
+            <span className="opacity-75">·</span>
+            <span>{formatFollowUpTime(followUpReminder.nextFollowUpAt)}</span>
+            {followUpReminder.marked && (
+              <>
+                <span className="opacity-75">·</span>
+                <User className="w-3 h-3" />
+              </>
+            )}
           </div>
         </div>
       )}

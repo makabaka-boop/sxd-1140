@@ -2,6 +2,8 @@ export type TaskStatus = 'pending' | 'to_visit' | 'processing' | 'to_review' | '
 
 export type AppointmentStatus = 'today' | 'upcoming' | 'scheduled' | 'expired' | 'completed' | 'none';
 
+export type FollowUpStatus = 'pending' | 'today' | 'overdue' | 'completed' | 'none';
+
 export type Role = 'admin' | 'staff' | 'supervisor';
 
 export interface Urgency {
@@ -36,7 +38,7 @@ export interface MoveRecord {
 export interface ProcessRecord {
   id: string;
   taskId: string;
-  type: 'status_change' | 'edit' | 'note' | 'appointment';
+  type: 'status_change' | 'edit' | 'note' | 'appointment' | 'follow_up';
   status?: TaskStatus;
   previousStatus?: TaskStatus;
   content: string;
@@ -48,6 +50,30 @@ export interface Appointment {
   scheduledAt: number | null;
   note: string;
   notifiedResident: boolean;
+}
+
+export interface FollowUpReminder {
+  id: string;
+  taskId: string;
+  nextFollowUpAt: number;
+  reason: string;
+  note: string;
+  assigneeId: string | null;
+  marked: boolean;
+  status: 'active' | 'completed';
+  createdAt: number;
+  updatedAt: number;
+  completedAt: number | null;
+}
+
+export interface FollowUpRecord {
+  id: string;
+  taskId: string;
+  reminderId: string;
+  action: 'create' | 'edit' | 'complete';
+  content: string;
+  createdAt: number;
+  operator?: string;
 }
 
 export interface RepairTask {
@@ -74,6 +100,7 @@ export interface FilterOptions {
   urgencyId: string | null;
   status: TaskStatus | null;
   appointmentStatus: AppointmentStatus | null;
+  followUpStatus: FollowUpStatus | null;
 }
 
 export interface AppState {
@@ -82,6 +109,8 @@ export interface AppState {
   repairTypes: RepairType[];
   assignees: Assignee[];
   moveRecords: MoveRecord[];
+  followUpReminders: FollowUpReminder[];
+  followUpRecords: FollowUpRecord[];
   filters: FilterOptions;
   currentRole: Role;
 }
@@ -121,6 +150,30 @@ export const APPOINTMENT_STATUS_COLORS: Record<AppointmentStatus, string> = {
   completed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   none: 'bg-gray-50 text-gray-500 border-gray-200',
 };
+
+export const FOLLOW_UP_STATUS_LABELS: Record<FollowUpStatus, string> = {
+  pending: '待跟进',
+  today: '今日跟进',
+  overdue: '已逾期',
+  completed: '已完成跟进',
+  none: '无跟进',
+};
+
+export const FOLLOW_UP_STATUS_COLORS: Record<FollowUpStatus, string> = {
+  pending: 'bg-amber-50 text-amber-700 border-amber-200',
+  today: 'bg-blue-50 text-blue-700 border-blue-200',
+  overdue: 'bg-red-50 text-red-700 border-red-200',
+  completed: 'bg-green-50 text-green-700 border-green-200',
+  none: 'bg-gray-50 text-gray-500 border-gray-200',
+};
+
+export const FOLLOW_UP_REASONS = [
+  '住户催促',
+  '进度缓慢',
+  '需要协调',
+  '材料待确认',
+  '其他原因',
+];
 
 export const ROLE_LABELS: Record<Role, string> = {
   admin: '管理员',

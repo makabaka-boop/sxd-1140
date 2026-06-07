@@ -1,6 +1,6 @@
 import { useTaskStore } from '@/store/useTaskStore';
-import { BUILDINGS, STATUS_LABELS, APPOINTMENT_STATUS_LABELS, type TaskStatus, type AppointmentStatus } from '@/types';
-import { Filter, X, ChevronDown } from 'lucide-react';
+import { BUILDINGS, STATUS_LABELS, APPOINTMENT_STATUS_LABELS, FOLLOW_UP_STATUS_LABELS, type TaskStatus, type AppointmentStatus, type FollowUpStatus } from '@/types';
+import { Filter, X, ChevronDown, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export const FilterBar = () => {
@@ -10,7 +10,7 @@ export const FilterBar = () => {
   const assignees = useTaskStore(state => state.assignees);
   const urgencies = useTaskStore(state => state.urgencies);
 
-  const hasActiveFilters = filters.assigneeId || filters.building || filters.urgencyId || filters.status || filters.appointmentStatus;
+  const hasActiveFilters = filters.assigneeId || filters.building || filters.urgencyId || filters.status || filters.appointmentStatus || filters.followUpStatus;
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
@@ -85,6 +85,20 @@ export const FilterBar = () => {
             >
               <option value="">全部预约状态</option>
               {Object.entries(APPOINTMENT_STATUS_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          </div>
+
+          <div className="relative">
+            <select
+              value={filters.followUpStatus || ''}
+              onChange={e => setFilters({ followUpStatus: (e.target.value as FollowUpStatus) || null })}
+              className="appearance-none bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 pr-8 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent cursor-pointer"
+            >
+              <option value="">全部跟进状态</option>
+              {Object.entries(FOLLOW_UP_STATUS_LABELS).map(([key, label]) => (
                 <option key={key} value={key}>{label}</option>
               ))}
             </select>
