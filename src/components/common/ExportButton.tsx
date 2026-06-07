@@ -6,11 +6,20 @@ import { exportToCSV, exportToJSON } from '@/utils/export';
 export const ExportButton = () => {
   const [isOpen, setIsOpen] = useState(false);
   const tasks = useTaskStore(state => state.tasks);
+  const filters = useTaskStore(state => state.filters);
   const urgencies = useTaskStore(state => state.urgencies);
   const repairTypes = useTaskStore(state => state.repairTypes);
   const assignees = useTaskStore(state => state.assignees);
 
-  const data = { tasks, urgencies, repairTypes, assignees };
+  const filteredTasks = tasks.filter(task => {
+    if (filters.assigneeId && task.assigneeId !== filters.assigneeId) return false;
+    if (filters.building && task.building !== filters.building) return false;
+    if (filters.urgencyId && task.urgencyId !== filters.urgencyId) return false;
+    if (filters.status && task.status !== filters.status) return false;
+    return true;
+  });
+
+  const data = { tasks: filteredTasks, urgencies, repairTypes, assignees };
 
   return (
     <div className="relative">

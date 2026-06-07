@@ -11,11 +11,13 @@ interface BoardColumnProps {
   assignees: Assignee[];
   repairTypes: RepairType[];
   isOver?: boolean;
+  disabled?: boolean;
 }
 
-export const BoardColumn = ({ status, tasks, urgencies, assignees, repairTypes, isOver }: BoardColumnProps) => {
+export const BoardColumn = ({ status, tasks, urgencies, assignees, repairTypes, isOver, disabled }: BoardColumnProps) => {
   const { setNodeRef } = useDroppable({
     id: status,
+    disabled,
   });
 
   const count = tasks.length;
@@ -49,6 +51,7 @@ export const BoardColumn = ({ status, tasks, urgencies, assignees, repairTypes, 
             urgencies={urgencies}
             assignees={assignees}
             repairTypes={repairTypes}
+            disabled={disabled}
           />
         ))}
         {tasks.length === 0 && (

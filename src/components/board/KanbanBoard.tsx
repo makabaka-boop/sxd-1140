@@ -19,11 +19,11 @@ const STATUSES: TaskStatus[] = ['pending', 'to_visit', 'processing', 'to_review'
 
 export const KanbanBoard = () => {
   const tasks = useTaskStore(state => state.tasks);
+  const filters = useTaskStore(state => state.filters);
   const urgencies = useTaskStore(state => state.urgencies);
   const assignees = useTaskStore(state => state.assignees);
   const repairTypes = useTaskStore(state => state.repairTypes);
   const moveTask = useTaskStore(state => state.moveTask);
-  const getFilteredTasks = useTaskStore(state => state.getFilteredTasks);
   const currentRole = useTaskStore(state => state.currentRole);
 
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
@@ -37,7 +37,15 @@ export const KanbanBoard = () => {
     })
   );
 
-  const filteredTasks = useMemo(() => getFilteredTasks(), [getFilteredTasks]);
+  const filteredTasks = useMemo(() => {
+    return tasks.filter(task => {
+      if (filters.assigneeId && task.assigneeId !== filters.assigneeId) return false;
+      if (filters.building && task.building !== filters.building) return false;
+      if (filters.urgencyId && task.urgencyId !== filters.urgencyId) return false;
+      if (filters.status && task.status !== filters.status) return false;
+      return true;
+    });
+  }, [tasks, filters]);
 
   const tasksByStatus = useMemo(() => {
     const map: Record<TaskStatus, RepairTask[]> = {
@@ -57,7 +65,7 @@ export const KanbanBoard = () => {
   const activeTask = activeTaskId ? tasks.find(t => t.id === activeTaskId) : null;
 
   const handleDragStart = (event: { active: { id: string | number } }) => {
-    if (currentRole === 'supervisor') return;
+    if (currentRole !== 'staff') return;
     setActiveTaskId(String(event.active.id));
   };
 
@@ -75,7 +83,7 @@ export const KanbanBoard = () => {
     setActiveTaskId(null);
     setOverStatus(null);
 
-    if (!over || currentRole === 'supervisor') return;
+    if (!over || currentRole !== 'staff') return;
 
     const taskId = String(active.id);
     const toStatus = over.id as TaskStatus;
@@ -108,6 +116,7 @@ export const KanbanBoard = () => {
             assignees={assignees}
             repairTypes={repairTypes}
             isOver={overStatus === status}
+            disabled={currentRole !== 'staff'}
           />
         ))}
       </div>
@@ -119,6 +128,7 @@ export const KanbanBoard = () => {
               urgencies={urgencies}
               assignees={assignees}
               repairTypes={repairTypes}
+              disabled
             />
           </div>
         ) : null}

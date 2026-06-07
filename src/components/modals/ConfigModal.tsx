@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, Plus, Trash2, Edit2, Check } from 'lucide-react';
 import { useTaskStore } from '@/store/useTaskStore';
 import type { Urgency, RepairType } from '@/types';
+import { cn } from '@/lib/utils';
 
 interface ConfigModalProps {
   onClose: () => void;
@@ -11,6 +12,7 @@ type TabType = 'urgency' | 'repairType';
 
 export const ConfigModal = ({ onClose }: ConfigModalProps) => {
   const [activeTab, setActiveTab] = useState<TabType>('urgency');
+  const tasks = useTaskStore(state => state.tasks);
   const urgencies = useTaskStore(state => state.urgencies);
   const repairTypes = useTaskStore(state => state.repairTypes);
   const addUrgency = useTaskStore(state => state.addUrgency);
@@ -24,6 +26,30 @@ export const ConfigModal = ({ onClose }: ConfigModalProps) => {
   const [newUrgency, setNewUrgency] = useState({ name: '', color: '#52c41a', timeoutHours: 24 });
   const [newRepairType, setNewRepairType] = useState({ name: '', icon: 'MoreHorizontal' });
   const [editForm, setEditForm] = useState<Partial<Urgency | RepairType>>({});
+
+  const isUrgencyUsed = (urgencyId: string): boolean => {
+    return tasks.some(t => t.urgencyId === urgencyId);
+  };
+
+  const isRepairTypeUsed = (typeId: string): boolean => {
+    return tasks.some(t => t.typeId === typeId);
+  };
+
+  const handleDeleteUrgency = (id: string) => {
+    if (isUrgencyUsed(id)) {
+      alert('该紧急程度正在被任务使用，无法删除！');
+      return;
+    }
+    deleteUrgency(id);
+  };
+
+  const handleDeleteRepairType = (id: string) => {
+    if (isRepairTypeUsed(id)) {
+      alert('该维修类型正在被任务使用，无法删除！');
+      return;
+    }
+    deleteRepairType(id);
+  };
 
   const handleAddUrgency = () => {
     if (!newUrgency.name.trim()) return;
@@ -159,7 +185,17 @@ export const ConfigModal = ({ onClose }: ConfigModalProps) => {
                         <button onClick={() => startEdit(u, 'urgency')} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded">
                           <Edit2 className="w-4 h-4" />
                         </button>
-                        <button onClick={() => deleteUrgency(u.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded">
+                        <button
+                          onClick={() => handleDeleteUrgency(u.id)}
+                          disabled={isUrgencyUsed(u.id)}
+                          className={cn(
+                            'p-1.5 rounded transition-colors',
+                            isUrgencyUsed(u.id)
+                              ? 'text-gray-300 cursor-not-allowed'
+                              : 'text-gray-400 hover:text-red-600 hover:bg-red-50'
+                          )}
+                          title={isUrgencyUsed(u.id) ? '正在被任务使用，无法删除' : '删除'}
+                        >
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </>
@@ -223,7 +259,17 @@ export const ConfigModal = ({ onClose }: ConfigModalProps) => {
                         <button onClick={() => startEdit(t, 'repairType')} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded">
                           <Edit2 className="w-4 h-4" />
                         </button>
-                        <button onClick={() => deleteRepairType(t.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded">
+                        <button
+                          onClick={() => handleDeleteRepairType(t.id)}
+                          disabled={isRepairTypeUsed(t.id)}
+                          className={cn(
+                            'p-1.5 rounded transition-colors',
+                            isRepairTypeUsed(t.id)
+                              ? 'text-gray-300 cursor-not-allowed'
+                              : 'text-gray-400 hover:text-red-600 hover:bg-red-50'
+                          )}
+                          title={isRepairTypeUsed(t.id) ? '正在被任务使用，无法删除' : '删除'}
+                        >
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </>

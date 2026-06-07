@@ -30,12 +30,13 @@ interface TaskCardProps {
   urgencies: Urgency[];
   assignees: Assignee[];
   repairTypes: RepairType[];
-  isDragging?: boolean;
+  disabled?: boolean;
 }
 
-export const TaskCard = ({ task, urgencies, assignees, repairTypes }: TaskCardProps) => {
+export const TaskCard = ({ task, urgencies, assignees, repairTypes, disabled }: TaskCardProps) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
+    disabled,
   });
 
   const style = {
@@ -56,9 +57,10 @@ export const TaskCard = ({ task, urgencies, assignees, repairTypes }: TaskCardPr
       {...attributes}
       {...listeners}
       className={cn(
-        'bg-white rounded-lg p-4 shadow-sm border border-gray-100 cursor-grab active:cursor-grabbing transition-all duration-200',
+        'bg-white rounded-lg p-4 shadow-sm border border-gray-100 transition-all duration-200',
+        disabled ? 'cursor-default' : 'cursor-grab active:cursor-grabbing',
         isDragging && 'opacity-50 shadow-lg rotate-2',
-        !isDragging && 'hover:shadow-md hover:-translate-y-0.5'
+        !isDragging && !disabled && 'hover:shadow-md hover:-translate-y-0.5'
       )}
     >
       <div className="flex items-start justify-between mb-3">
