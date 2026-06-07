@@ -1,6 +1,6 @@
 import type { RepairTask, Urgency, RepairType, Assignee, FollowUpReminder } from '@/types';
 import { STATUS_LABELS as statusLabels, APPOINTMENT_STATUS_LABELS, FOLLOW_UP_STATUS_LABELS } from '@/types';
-import { getAppointmentStatus, getTaskActiveFollowUp, getFollowUpStatus, formatFollowUpTime } from '@/utils/statistics';
+import { getAppointmentStatus, getTaskActiveFollowUp, getTaskLatestFollowUp, getFollowUpStatus, getTaskFollowUpStatus, formatFollowUpTime } from '@/utils/statistics';
 
 interface ExportData {
   tasks: RepairTask[];
@@ -52,18 +52,22 @@ export const exportToCSV = (data: ExportData): void => {
     const appointmentNote = task.appointment?.note || '';
     const notifiedResident = task.appointment?.notifiedResident ? '是' : '否';
     
-    const followUpReminder = getTaskActiveFollowUp(task.id, followUpReminders);
-    const followUpStatus = getFollowUpStatus(followUpReminder);
+    const followUpStatus = getTaskFollowUpStatus(task.id, followUpReminders);
     const followUpStatusLabel = FOLLOW_UP_STATUS_LABELS[followUpStatus];
-    const followUpTime = followUpReminder?.nextFollowUpAt
-      ? new Date(followUpReminder.nextFollowUpAt).toLocaleString('zh-CN')
+    
+    const activeFollowUp = getTaskActiveFollowUp(task.id, followUpReminders);
+    const latestFollowUp = getTaskLatestFollowUp(task.id, followUpReminders);
+    const displayFollowUp = activeFollowUp || latestFollowUp;
+    
+    const followUpTime = displayFollowUp?.nextFollowUpAt
+      ? new Date(displayFollowUp.nextFollowUpAt).toLocaleString('zh-CN')
       : '';
-    const followUpReason = followUpReminder?.reason || '';
-    const followUpNote = followUpReminder?.note || '';
-    const followUpAssignee = followUpReminder?.assigneeId
-      ? assignees.find(a => a.id === followUpReminder.assigneeId)?.name || ''
+    const followUpReason = displayFollowUp?.reason || '';
+    const followUpNote = displayFollowUp?.note || '';
+    const followUpAssignee = displayFollowUp?.assigneeId
+      ? assignees.find(a => a.id === displayFollowUp.assigneeId)?.name || ''
       : '';
-    const followUpMarked = followUpReminder?.marked ? '是' : '否';
+    const followUpMarked = displayFollowUp?.marked ? '是' : '否';
     
     const createdAt = new Date(task.createdAt).toLocaleString('zh-CN');
     const updatedAt = new Date(task.updatedAt).toLocaleString('zh-CN');

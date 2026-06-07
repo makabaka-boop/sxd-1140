@@ -118,6 +118,12 @@ export const getTaskActiveFollowUp = (taskId: string, reminders: FollowUpReminde
   return reminders.find(r => r.taskId === taskId && r.status === 'active');
 };
 
+export const getTaskLatestFollowUp = (taskId: string, reminders: FollowUpReminder[]): FollowUpReminder | undefined => {
+  const taskReminders = reminders.filter(r => r.taskId === taskId);
+  if (taskReminders.length === 0) return undefined;
+  return taskReminders.sort((a, b) => b.updatedAt - a.updatedAt)[0];
+};
+
 export const getFollowUpStatus = (reminder: FollowUpReminder | undefined): FollowUpStatus => {
   if (!reminder) return 'none';
   if (reminder.status === 'completed') return 'completed';
@@ -139,8 +145,15 @@ export const getFollowUpStatus = (reminder: FollowUpReminder | undefined): Follo
 };
 
 export const getTaskFollowUpStatus = (taskId: string, reminders: FollowUpReminder[]): FollowUpStatus => {
-  const reminder = getTaskActiveFollowUp(taskId, reminders);
-  return getFollowUpStatus(reminder);
+  const activeReminder = getTaskActiveFollowUp(taskId, reminders);
+  if (activeReminder) {
+    return getFollowUpStatus(activeReminder);
+  }
+  const latestReminder = getTaskLatestFollowUp(taskId, reminders);
+  if (latestReminder && latestReminder.status === 'completed') {
+    return 'completed';
+  }
+  return 'none';
 };
 
 export const formatFollowUpTime = (timestamp: number | null): string => {

@@ -23,7 +23,7 @@ import {
 import { useTaskStore } from '@/store/useTaskStore';
 import type { TaskStatus, RepairTask, Appointment, FollowUpReminder } from '@/types';
 import { STATUS_LABELS, STATUS_COLORS, ROLE_LABELS, BUILDINGS, APPOINTMENT_STATUS_LABELS, APPOINTMENT_STATUS_COLORS, FOLLOW_UP_STATUS_LABELS, FOLLOW_UP_STATUS_COLORS, FOLLOW_UP_REASONS } from '@/types';
-import { formatTimeAgo, getAppointmentStatus, formatAppointmentTime, getTaskActiveFollowUp, getFollowUpStatus, formatFollowUpTime } from '@/utils/statistics';
+import { formatTimeAgo, getAppointmentStatus, formatAppointmentTime, getTaskActiveFollowUp, getTaskLatestFollowUp, getFollowUpStatus, formatFollowUpTime } from '@/utils/statistics';
 import { cn } from '@/lib/utils';
 
 const STATUSES: TaskStatus[] = ['pending', 'to_visit', 'processing', 'to_review', 'completed', 'deferred'];
@@ -152,12 +152,25 @@ export const TaskDetailModal = () => {
 
   const activeFollowUp = useMemo(() => {
     if (!task) return undefined;
-    return getTaskActiveFollowUp(task.id);
+    return followUpReminders.find(r => r.taskId === task.id && r.status === 'active');
+  }, [task, followUpReminders]);
+
+  const latestFollowUp = useMemo(() => {
+    if (!task) return undefined;
+    const taskReminders = followUpReminders.filter(r => r.taskId === task.id);
+    if (taskReminders.length === 0) return undefined;
+    return taskReminders.sort((a, b) => b.updatedAt - a.updatedAt)[0];
   }, [task, followUpReminders]);
 
   const followUpStatus = useMemo(() => {
-    return getFollowUpStatus(activeFollowUp);
-  }, [activeFollowUp]);
+    if (activeFollowUp) {
+      return getFollowUpStatus(activeFollowUp);
+    }
+    if (latestFollowUp && latestFollowUp.status === 'completed') {
+      return 'completed';
+    }
+    return 'none';
+  }, [activeFollowUp, latestFollowUp]);
 
   const sortedRecords = useMemo(() => {
     if (!task) return [];
@@ -836,23 +849,52 @@ export const TaskDetailModal = () => {
                         <p className="text-sm text-red-700">该跟进已逾期，请尽快处理！</p>
                       </div>
                     )}
-                    {activeFollowUp && (
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={completeFollowUpNote}
-                          onChange={e => setCompleteFollowUpNote(e.target.value)}
-                          placeholder="完成跟进备注（可选）..."
-                          className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                        />
-                        <button
-                          onClick={handleCompleteFollowUp}
-                          className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
-                        >
-                          完成
-                        </button>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={completeFollowUpNote}
+                        onChange={e => setCompleteFollowUpNote(e.target.value)}
+                        placeholder="完成跟进备注（可选）..."
+                        className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      />
+                      <button
+                        onClick={handleCompleteFollowUp}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+                      >
+                        完成
+                      </button>
+                    </div>
+                  </div>
+                ) : latestFollowUp && latestFollowUp.status === 'completed' ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className={cn('px-2.5 py-1 rounded-full text-xs font-medium border', FOLLOW_UP_STATUS_COLORS.completed)}>
+                        {FOLLOW_UP_STATUS_LABELS.completed}
+                      </span>
+                      <div className="flex items-center gap-1.5 text-sm text-gray-700">
+                        <Clock className="w-4 h-4 text-gray-400" />
+                        完成时间：{latestFollowUp.completedAt ? new Date(latestFollowUp.completedAt).toLocaleString('zh-CN') : ''}
                       </div>
+                      <div className="flex items-center gap-1 text-sm text-gray-700">
+                        <span className="text-gray-500">原因：</span>
+                        <span className="font-medium">{latestFollowUp.reason}</span>
+                      </div>
+                      {latestFollowUp.assigneeId && (
+                        <div className="flex items-center gap-1 text-sm text-gray-700">
+                          <User className="w-4 h-4 text-gray-400" />
+                          {assignees.find(a => a.id === latestFollowUp.assigneeId)?.name || '未指定'}
+                        </div>
+                      )}
+                    </div>
+                    {latestFollowUp.note && (
+                      <p className="text-sm text-gray-600 bg-white rounded-lg p-3 border border-gray-100">
+                        催办备注：{latestFollowUp.note}
+                      </p>
                     )}
+                    <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg border border-green-100">
+                      <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+                      <p className="text-sm text-green-700">该跟进已完成</p>
+                    </div>
                   </div>
                 ) : (
                   <div className="text-center py-4">
