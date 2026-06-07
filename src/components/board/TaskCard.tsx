@@ -55,7 +55,7 @@ export const TaskCard = ({ task, urgencies, assignees, repairTypes, disabled }: 
   const TypeIcon = repairType ? iconMap[repairType.icon] || MoreHorizontal : MoreHorizontal;
 
   const handleClick = (e: React.MouseEvent) => {
-    if (disabled || isDragging) return;
+    if (isDragging) return;
     openDetailModal(task.id);
   };
 

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   X,
   Edit2,
@@ -69,6 +69,16 @@ export const TaskDetailModal = () => {
   const task = useMemo(() => {
     return tasks.find(t => t.id === selectedTaskId);
   }, [tasks, selectedTaskId]);
+
+  useEffect(() => {
+    if (!isDetailModalOpen || !selectedTaskId) {
+      setIsEditing(false);
+      setEditForm({});
+      setEditNote('');
+      setNewNote('');
+      setStatusNote('');
+    }
+  }, [isDetailModalOpen, selectedTaskId]);
 
   const urgency = useMemo(() => {
     return urgencies.find(u => u.id === task?.urgencyId);
